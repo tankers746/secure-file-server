@@ -32,7 +32,7 @@ public class FileServer {
         DataInputStream clientData = new DataInputStream(in);   
            
         String fileName = clientData.readUTF();
-        String filePath = DOWNLOADS + "\"" +  fileName;
+        String filePath = DOWNLOADS + "/" +  fileName;
         
         OutputStream output = new FileOutputStream(filePath);     
         long size = clientData.readLong();     
