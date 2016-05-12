@@ -1,79 +1,128 @@
-#include <sys/socket.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <signal.h>
+#include <ctype.h>          
+#include <arpa/inet.h>
 #include <netdb.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
-#include <arpa/inet.h> 
+#include <libgen.h>
 
-int port = 1342;
-char filename[] = "/Users/tom/Desktop/whichbus.c";
+
+
+#define PORT 1342
+#define LENGTH 1024 
+char *filePath = "/Users/tom/Desktop/chart.png";
+char *serverAddr = "192.168.15.108";
+
+
+void error(const char *msg)
+{
+	perror(msg);
+	exit(1);
+}
 
 int main(int argc, char *argv[])
 {
-	int sockfd = 0, n = 0, connfd = 0;
-	char recvBuff[1024];
-	char sendBuff[1025];
-	
-	FILE *inputFile = fopen(filename, "wb");
-	if(inputFile == NULL)
+	/* Variable Definition */
+	int sockfd; 
+	int nsockfd;
+	char revbuf[LENGTH]; 
+	struct sockaddr_in remote_addr;
+	char *fileName = basename(filePath);
+
+
+	/* Get the Socket file descriptor */
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 	{
-	  fprintf(stderr, "Something went south!");
-	  return 1;
-	}	
-
-	struct sockaddr_in serv_addr; 
-
-	if(argc < 2)
-	{
-		printf("\n Usage: %s <ip of server> \n",argv[0]);
-		return 1;
-	} 
-
-	memset(recvBuff, '0', sizeof(recvBuff));
-	memset(sendBuff, '0', sizeof(sendBuff)); 
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	{
-		printf("\n Error : Could not create socket \n");
-		return 1;
-	} 
-
-	memset(&serv_addr, '0', sizeof(serv_addr)); 
-
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(port); 
-
-	if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0)
-	{
-		printf("\n inet_pton error occured\n");
-		return 1;
-	} 
-
-	if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-	{
-	   printf("\n Error : Connect Failed \n");
-	   return 1;
+		fprintf(stderr, "ERROR: Failed to obtain Socket Descriptor! (errno = %d)\n",errno);
+		exit(1);
 	}
-	printf("Connected to %s:%i\n",argv[1],port);
 
-	//send file
-	int bytesRead = fread(sendBuff, sizeof(sendBuff), 1, inputFile);
-	while (!feof(inputFile))
+	/* Fill the socket address struct */
+	remote_addr.sin_family = AF_INET; 
+	remote_addr.sin_port = htons(PORT); 
+	inet_pton(AF_INET, serverAddr, &remote_addr.sin_addr); 
+	bzero(&(remote_addr.sin_zero), 8);
+
+	/* Try to connect the remote */
+	if (connect(sockfd, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr)) == -1)
 	{
-		send(sockfd, sendBuff, bytesRead, 0);
-		bytesRead = fread(sendBuff, sizeof(sendBuff), 1, inputFile);
-		printf("%i bytes sent\i",(int)sizeof(sendBuff));
-	} 
-	printf("Sent file %s\n",filename);
+		fprintf(stderr, "ERROR: Failed to connect to the host! (errno = %d)\n",errno);
+		exit(1);
+	}
+	else 
+		printf("[Client] Connected to server at port %d...ok!\n", PORT);
+
+	/* Send File to Server */
+	//if(!fork())
+	//{
+		char sdbuf[LENGTH]; 
+		printf("[Client] Sending %s to the Server... ", fileName);
+		FILE *fs = fopen(filePath, "r");
+		if(fs == NULL)
+		{
+			printf("ERROR: File %s not found.\n", filePath);
+			exit(1);
+		}
+
+		bzero(sdbuf, LENGTH); 
+		int fs_block_sz; 
+		while((fs_block_sz = fread(sdbuf, sizeof(char), LENGTH, fs)) > 0)
+		{
+		    if(send(sockfd, sdbuf, fs_block_sz, 0) < 0)
+		    {
+		        fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", fileName, errno);
+		        break;
+		    }
+		    bzero(sdbuf, LENGTH);
+		}
+		printf("Ok File %s from Client was Sent!\n", fileName);
+	//}
+
+	/* Receive File from Server */
+	printf("[Client] Receiveing file from Server and saving it as final.txt...");
+	char* fr_name = "/home/aryan/Desktop/progetto/final.txt";
+	FILE *fr = fopen(fr_name, "a");
+	if(fr == NULL)
+		printf("File %s Cannot be opened.\n", fr_name);
+	else
+	{
+		bzero(revbuf, LENGTH); 
+		int fr_block_sz = 0;
+	    while((fr_block_sz = recv(sockfd, revbuf, LENGTH, 0)) > 0)
+	    {
+			int write_sz = fwrite(revbuf, sizeof(char), fr_block_sz, fr);
+	        if(write_sz < fr_block_sz)
+			{
+	            error("File write failed.\n");
+	        }
+			bzero(revbuf, LENGTH);
+			if (fr_block_sz == 0 || fr_block_sz != 512) 
+			{
+				break;
+			}
+		}
+		if(fr_block_sz < 0)
+        {
+			if (errno == EAGAIN)
+			{
+				printf("recv() timed out.\n");
+			}
+			else
+			{
+				fprintf(stderr, "recv() failed due to errno = %d\n", errno);
+			}
+		}
+	    printf("Ok received from server!\n");
+	    fclose(fr);
+	}
 	close(sockfd);
-
-	if(n < 0)
-	{
-		printf("\n Read error \n");
-	} 
-
-	return 0;
+	printf("[Client] Connection lost.\n");
+	return (0);
 }
