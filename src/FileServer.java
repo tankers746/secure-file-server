@@ -10,7 +10,7 @@ import java.net.Socket;
 public class FileServer {
 
   public final static int SOCKET_PORT = 1342;  // you may change this
-  public final static String DOWNLOADS = "c:/users/Tom/desktop";  // you may change this
+  public final static String DOWNLOADS = "C:/Users/Jason/Documents";  // you may change this
   public final static int FILE_SIZE = 6022386;
   
   public static void main (String [] args ) throws IOException {
