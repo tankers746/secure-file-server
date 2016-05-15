@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <sys/stat.h>
 
 
 
@@ -27,6 +28,30 @@ void error(const char *msg)
 	exit(1);
 }
 
+char *sendMetaData(char *path, int sock) {
+	char *name;
+	int size;
+	char buffer[LENGTH];
+	
+	struct stat st;
+	stat(path, &st);
+	size = st.st_size;
+	name = basename(path);
+	
+	if(send(sock, &size, sizeof(int), 0) < 0) {
+		fprintf(stderr, "ERROR: Failed to send file size. (errno = %d)\n", errno);
+	}
+
+	memset(buffer, '\0', LENGTH);
+	memcpy(buffer, &name, sizeof(name));
+	if(send(sock, buffer, sizeof(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: Failed to send file name. (errno = %d)\n", errno);
+	}
+	
+	return name;
+}
+
+
 int main(int argc, char *argv[])
 {
 	/* Variable Definition */
@@ -34,8 +59,7 @@ int main(int argc, char *argv[])
 	int nsockfd;
 	char revbuf[LENGTH]; 
 	struct sockaddr_in remote_addr;
-	char *fileName = basename(filePath);
-
+	
 
 	/* Get the Socket file descriptor */
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -48,7 +72,7 @@ int main(int argc, char *argv[])
 	remote_addr.sin_family = AF_INET; 
 	remote_addr.sin_port = htons(PORT); 
 	inet_pton(AF_INET, serverAddr, &remote_addr.sin_addr); 
-	bzero(&(remote_addr.sin_zero), 8);
+	memset(&(remote_addr.sin_zero),'\0',8);
 
 	/* Try to connect the remote */
 	if (connect(sockfd, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr)) == -1)
@@ -63,7 +87,6 @@ int main(int argc, char *argv[])
 	//if(!fork())
 	//{
 		char sdbuf[LENGTH]; 
-		printf("[Client] Sending %s to the Server... ", fileName);
 		FILE *fs = fopen(filePath, "r");
 		if(fs == NULL)
 		{
@@ -71,7 +94,12 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		bzero(sdbuf, LENGTH); 
+		char *fileName = sendMetaData(filePath, sockfd);
+
+
+		printf("[Client] Sending %s to the Server... ", fileName);
+
+		memset(sdbuf, '\0', LENGTH);
 		int fs_block_sz; 
 		while((fs_block_sz = fread(sdbuf, sizeof(char), LENGTH, fs)) > 0)
 		{
@@ -80,7 +108,7 @@ int main(int argc, char *argv[])
 		        fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", fileName, errno);
 		        break;
 		    }
-		    bzero(sdbuf, LENGTH);
+		    memset(sdbuf, '\0', LENGTH);
 		}
 		printf("Ok File %s from Client was Sent!\n", fileName);
 	//}
@@ -93,7 +121,7 @@ int main(int argc, char *argv[])
 		printf("File %s Cannot be opened.\n", fr_name);
 	else
 	{
-		bzero(revbuf, LENGTH); 
+		memset(revbuf, '\0', LENGTH);
 		int fr_block_sz = 0;
 	    while((fr_block_sz = recv(sockfd, revbuf, LENGTH, 0)) > 0)
 	    {
@@ -102,7 +130,7 @@ int main(int argc, char *argv[])
 			{
 	            error("File write failed.\n");
 	        }
-			bzero(revbuf, LENGTH);
+			memset(revbuf, '\0', LENGTH);
 			if (fr_block_sz == 0 || fr_block_sz != 512) 
 			{
 				break;
