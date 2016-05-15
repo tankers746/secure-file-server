@@ -34,8 +34,8 @@ public class Server extends Thread {
 			try {
 				Socket clientSock = ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
-				//saveFile(clientSock);
-                                sendFile(clientSock,"C:/Users/Tom/Desktop/test.pdf");
+				saveFile(clientSock);
+                                sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -78,8 +78,16 @@ public class Server extends Thread {
                 System.out.println("\nFile saved in " + DOWNLOADS + '/' + fileName);
 		
 		fos.close();
-		dis.close();
+		//dis.close();
 	}
+        
+        public byte[] intToByteArray(int value) {
+            return new byte[] {
+                (byte)(value >>> 24),
+                (byte)(value >>> 16),
+                (byte)(value >>> 8),
+                (byte)value};
+        }
         
         private void sendFile(Socket clientSock, String path) throws IOException {
                 File myFile = new File(path);  
@@ -92,12 +100,11 @@ public class Server extends Thread {
                 DataInputStream dis = new DataInputStream(bis);     
                 dis.readFully(mybytearray, 0, mybytearray.length);  
 
-                OutputStream os = clientSock.getOutputStream();  
 
                 //Sending file name and file size to the server  
-                DataOutputStream dos = new DataOutputStream(os);     
+                DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
                 int fileSize = mybytearray.length;
-                dos.writeInt(fileSize);
+                dos.write(intToByteArray(fileSize), 0, 4);
                 
                 String fileName = myFile.getName() + new String(new char[BUFFSIZE]);
                 
@@ -107,13 +114,16 @@ public class Server extends Thread {
                 
                 dos.write(mybytearray, 0, mybytearray.length);     
                 dos.flush();  
+                System.out.println("File sent!\n");
+                        
+                        
 
                 //Sending file data to the server  
-                os.write(mybytearray, 0, mybytearray.length);  
-                os.flush();  
+//                os.write(mybytearray, 0, mybytearray.length);  
+  //              os.flush();  
 
                 //Closing socket
-                os.close();
+                //os.close();
                 dos.close();           
         }
 	
