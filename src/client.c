@@ -13,13 +13,14 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <math.h>
 
 
 
-#define PORT 1342
 #define LENGTH 1024
-char *filePath = "/Users/tom/Desktop/audio-vga.m4v";
-char *serverAddr = "192.168.15.108";
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
 
 
 void error(const char *msg)
@@ -32,6 +33,7 @@ char *sendMetaData(char *path, int sock) {
     char *name;
     int size;
     char buffer[LENGTH];
+    memset(buffer, '\0', LENGTH);
     
     struct stat st;
     stat(path, &st);
@@ -40,43 +42,48 @@ char *sendMetaData(char *path, int sock) {
     
     if(send(sock, &size, sizeof(size), 0) < 0) {
         fprintf(stderr, "ERROR: Failed to send file size. (errno = %d)\n", errno);
+        //return '\0';
     }
     
-    //memset(buffer, '\0', LENGTH);
+    
     strcpy(buffer, name);
     if(send(sock, buffer, sizeof(buffer), 0) < 0) {
         fprintf(stderr, "ERROR: Failed to send file name. (errno = %d)\n", errno);
+        //return '\0';
     }
     
     return name;
 }
 
 char *recvFileName(int sock) {
-    char *name;
     char buffer[LENGTH];
+    char *name = malloc((NAME_MAX+1) * sizeof(char));
     memset(buffer, '\0', sizeof(int));
     
     int bytesReceived = 0;
-    while((bytesReceived = read(sock, buffer, LENGTH)) > 0) {
+    while((bytesReceived = recv(sock, buffer, LENGTH, 0)) > 0) {
         if (bytesReceived == LENGTH)
         {
             break;
         }
     }
-    if(bytesReceived < 0)
+    if(bytesReceived <= 0)
     {
         if (errno == EAGAIN)
         {
-            printf("recv() timed out.\n");
+            fprintf(stderr,"recv() timed out.\n");
+            //return '\0';
         }
         else
         {
             fprintf(stderr, "recv() failed due to errno = %d\n", errno);
+            //return '\0';
         }
     }
 
     printf("Bytes received: %i Contents of buffer: %s\n",bytesReceived,buffer);
-    return buffer;
+    strcpy(name, buffer);
+    return name;
     
 }
 
@@ -86,123 +93,107 @@ int recvFileSize(int sock) {
     memset(intbuff, '\0', sizeof(int));
     
     int bytesReceived = 0;
-    while(1) {
-        bytesReceived = recv(sock, int, sizeof(int),0);
+    while((bytesReceived = recv(sock, intbuff, sizeof(int), 0)) > 0) {
         if (bytesReceived == sizeof(int))
         {
             break;
         }
     }
-    if(bytesReceived < 0)
+    if(bytesReceived <= 0)
     {
         if (errno == EAGAIN)
         {
-            printf("recv() timed out.\n");
+            fprintf(stderr,"recv() timed out.\n");
+            return 0;
         }
         else
         {
             fprintf(stderr, "recv() failed due to errno = %d\n", errno);
+            return 0;
         }
     }
     size = ntohl(*((int*)intbuff));
     return size;
 }
 
+int sendFile(int sock, char *filePath) {
+    char buffer[LENGTH];
+    FILE *fs = fopen(filePath, "r");
+    if(fs == NULL)
+    {
+        fprintf(stderr,"ERROR: File %s not found.\n", filePath);
+        return EXIT_FAILURE;
+    }
+    
+    char *fileName = sendMetaData(filePath, sock);
+    if(fileName == '\0') {
+        fprintf(stderr,"Failed to send file metadata\n");
+        return EXIT_FAILURE;
+    }
+    
+    printf("[Client] Sending %s to the Server...\n", fileName);
+    
+    memset(buffer, '\0', LENGTH);
+    int fs_block_sz;
+    while((fs_block_sz = fread(buffer, sizeof(char), LENGTH, fs)) > 0)
+    {
+        if(send(sock, buffer, fs_block_sz, 0) < 0)
+        {
+            fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", fileName, errno);
+            return EXIT_FAILURE;
+        }
+        memset(buffer, '\0', LENGTH);
+    }
+    printf("Ok File %s from Client was Sent!\n", fileName);
+    return EXIT_SUCCESS;
+}
 
-int main(int argc, char *argv[])
-{
-    /* Variable Definition */
-    int sockfd;
-    int nsockfd;
-    char revbuf[LENGTH];
-    struct sockaddr_in remote_addr;
+int receiveFile(int sock, char * downloadsFolder) {
     
+    int fileSize = recvFileSize(sock);
+    char *fileName = recvFileName(sock);
     
-    /* Get the Socket file descriptor */
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-    {
-        fprintf(stderr, "ERROR: Failed to obtain Socket Descriptor! (errno = %d)\n",errno);
-        exit(1);
+    if(fileSize == 0 || fileName == '\0') {
+        fprintf(stderr, "Error receiving file metadata from server\n");
+        return EXIT_FAILURE;
     }
     
-    /* Fill the socket address struct */
-    remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = htons(PORT);
-    inet_pton(AF_INET, serverAddr, &remote_addr.sin_addr);
-    memset(&(remote_addr.sin_zero),'\0',8);
-    
-    /* Try to connect the remote */
-    if (connect(sockfd, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr)) == -1)
-    {
-        fprintf(stderr, "ERROR: Failed to connect to the host! (errno = %d)\n",errno);
-        exit(1);
-    }
-    else
-        printf("[Client] Connected to server at port %d...ok!\n", PORT);
-    
-    /* Send File to Server */
-    //if(!fork())
-    //{
-    /*		char sdbuf[LENGTH];
-     FILE *fs = fopen(filePath, "r");
-     if(fs == NULL)
-     {
-     printf("ERROR: File %s not found.\n", filePath);
-     exit(1);
-     }
-     
-     char *fileName = sendMetaData(filePath, sockfd);
-     
-     
-     printf("[Client] Sending %s to the Server... ", fileName);
-     
-     memset(sdbuf, '\0', LENGTH);
-     int fs_block_sz;
-     while((fs_block_sz = fread(sdbuf, sizeof(char), LENGTH, fs)) > 0)
-     {
-     if(send(sockfd, sdbuf, fs_block_sz, 0) < 0)
-     {
-     fprintf(stderr, "ERROR: Failed to send file %s. (errno = %d)\n", fileName, errno);
-     break;
-     }
-     memset(sdbuf, '\0', LENGTH);
-     }
-     printf("Ok File %s from Client was Sent!\n", fileName);
-     //}
-     
-     */
-    /* Receive File from Server */
-    
-    
-    printf("[Client] Receiveing file from Server and saving it as final.txt...");
-    printf("hello\n");
-    int fileSize = recvFileSize(sockfd);
-    char *fileName = recvFileName(sockfd);
-    
+    char buffer[LENGTH];
     
     printf("Receiving %s which is %i bytes\n",fileName,fileSize);
-    char* fr_name = "/home/aryan/Desktop/progetto/final.txt";
-    FILE *fr = fopen(fr_name, "a");
-    if(fr == NULL)
-        printf("File %s Cannot be opened.\n", fr_name);
-    else
-    {
-        memset(revbuf, '\0', LENGTH);
-        int fr_block_sz = 0;
-        while((fr_block_sz = recv(sockfd, revbuf, LENGTH, 0)) > 0)
+    char filePath[PATH_MAX];
+    snprintf(filePath, sizeof(filePath), "%s/%s", downloadsFolder, fileName);
+    free(fileName);
+    
+    FILE *fr = fopen(filePath, "a");
+    if(fr == NULL) {
+        fprintf(stderr,"File %s Cannot be opened.\n", filePath);
+        return EXIT_FAILURE;
+    }
+        memset(buffer, '\0', LENGTH);
+        int bytesReceived = 0;
+        int totalWritten = 0;
+        int remaining = fileSize;
+        int n = 0;
+        
+        while((bytesReceived = recv(sock, buffer, MIN(LENGTH, remaining), 0)) > 0)
         {
-            int write_sz = fwrite(revbuf, sizeof(char), fr_block_sz, fr);
-            if(write_sz < fr_block_sz)
+            int bytesWritten = fwrite(buffer, sizeof(char), bytesReceived, fr);
+            if(bytesWritten < bytesReceived)
             {
                 error("File write failed.\n");
             }
-            memset(revbuf, '\0', LENGTH);
-            if (fr_block_sz == 0 || fr_block_sz != 512) 
-            {
-                break;
+            memset(buffer, '\0', LENGTH);
+            totalWritten = totalWritten + bytesWritten;
+            remaining = remaining - bytesWritten;
+            if(round(((double)totalWritten/(double)fileSize)*100) == n) {
+                n = n+5;
+                fprintf(stderr,"|");
             }
+            
         }
-        if(fr_block_sz < 0)
+        printf("\n");
+        if(bytesReceived < 0)
         {
             if (errno == EAGAIN)
             {
@@ -212,12 +203,66 @@ int main(int argc, char *argv[])
             {
                 fprintf(stderr, "recv() failed due to errno = %d\n", errno);
             }
+            
         }
         printf("Ok received from server!\n");
         fclose(fr);
+        return EXIT_SUCCESS;
+}
+
+int connectServer(char * serverAddr, int serverPort) {
+    
+    struct sockaddr_in remote_addr;
+    int sock;
+    
+    /* Get the Socket file descriptor */
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        fprintf(stderr, "ERROR: Failed to obtain Socket Descriptor! (errno = %d)\n",errno);
+        exit(EXIT_FAILURE);
     }
+    
+    /* Fill the socket address struct */
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(serverPort);
+    inet_pton(AF_INET, serverAddr, &remote_addr.sin_addr);
+    memset(&(remote_addr.sin_zero),'\0',8);
+    
+    /* Try to connect the remote */
+    if (connect(sock, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr)) == -1)
+    {
+        fprintf(stderr, "ERROR: Failed to connect to the host! (errno = %d)\n",errno);
+        exit(EXIT_FAILURE);
+    }
+    else {
+        
+        printf("[Client] Connected to server at port %d...ok!\n", serverPort);
+        return sock;
+    }
+    
+}
+
+
+int main(int argc, char *argv[])
+{
+    char *downloads = "/Users/tom/downloads";
+    char *address = "192.168.15.108";
+    char *path = "/Users/tom/desktop/audio-vga.m4v";
+    
+    int port = 1342;
+    /* Variable Definition */
+    int sockfd = connectServer(address, port);
+
+    if(sendFile(sockfd,path) == EXIT_FAILURE) {
+        fprintf(stderr, "Failed to send file to server\n");
+    }
+    
+    if(receiveFile(sockfd, downloads) == EXIT_FAILURE) {
+        fprintf(stderr, "Failed to receive file from server\n");
+    }
+    
     close(sockfd);
     printf("[Client] Connection lost.\n");
-    return (0);
+    exit(EXIT_SUCCESS);
 }
 
