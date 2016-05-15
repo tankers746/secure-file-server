@@ -18,7 +18,7 @@
 
 #define PORT 1342
 #define LENGTH 1024 
-char *filePath = "/Users/tom/Desktop/chart.png";
+char *filePath = "/Users/tom/Desktop/audio-vga.m4v";
 char *serverAddr = "192.168.15.108";
 
 
@@ -35,15 +35,15 @@ char *sendMetaData(char *path, int sock) {
 	
 	struct stat st;
 	stat(path, &st);
-	size = st.st_size;
+	size = htonl(st.st_size);
 	name = basename(path);
 	
-	if(send(sock, &size, sizeof(int), 0) < 0) {
+	if(send(sock, &size, sizeof(size), 0) < 0) {
 		fprintf(stderr, "ERROR: Failed to send file size. (errno = %d)\n", errno);
 	}
 
-	memset(buffer, '\0', LENGTH);
-	memcpy(buffer, &name, sizeof(name));
+	//memset(buffer, '\0', LENGTH);
+	strcpy(buffer, name);
 	if(send(sock, buffer, sizeof(buffer), 0) < 0) {
 		fprintf(stderr, "ERROR: Failed to send file name. (errno = %d)\n", errno);
 	}
@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
 		}
 		printf("Ok File %s from Client was Sent!\n", fileName);
 	//}
+	
 
 	/* Receive File from Server */
 	printf("[Client] Receiveing file from Server and saving it as final.txt...");
