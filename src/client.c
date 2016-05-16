@@ -258,15 +258,17 @@ void print_usage() {
 
 int main(int argc, char *argv[])
 {
+    if(argc == 1) {
+    	printf("Error no arguments\n");
+	print_usage();
+    }
     
     enum { SEND_MODE, FETCH_MODE, VOUCH_MODE } mode;
-    //------------------------
     int option = 0;
     int circumference = 0, port = 0;
     char *filepath, *hostname, *trustedname, certificate;
-    
+
     //Specifying the expected options
-    //The two options l and b expect numbers as argument
     while ((option = getopt(argc, argv,"a:c:f:h:ln:u:v:")) != -1) {
         switch (option) {
             case 'a' :
