@@ -34,8 +34,9 @@ public class Server extends Thread {
 			try {
 				Socket clientSock = ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
-				saveFile(clientSock);
-                                sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
+				serveClient(clientSock);
+                                //saveFile(clientSock);
+                                //sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -52,7 +53,6 @@ public class Server extends Thread {
                 dis.read(buffer, 0, BUFFSIZE);
                 String fileName = new String(buffer).split("\0")[0];
                 System.out.println("Filename is " + fileName);
-
                 
                 int read = 0;
 		int totalRead = 0;
@@ -81,7 +81,36 @@ public class Server extends Thread {
 		//dis.close();
 	}
         
-        public byte[] intToByteArray(int value) {
+        private void serveClient(Socket sock) throws IOException {
+            DataInputStream dis = new DataInputStream(sock.getInputStream());
+            byte[] buffer = new byte[BUFFSIZE];
+            dis.read(buffer, 0, BUFFSIZE);
+            String request = new String(buffer).split("\0")[0];
+            String[] requestArgs = request.split(" ");
+            System.out.println("Request is " + request);
+            switch (requestArgs[0]) {
+                case "add":
+                        saveFile(sock);
+                        break;
+                case "fetch":
+                        sendFile(sock, requestArgs[1]);
+                        break;
+                case "list":  
+                        sendList(sock);
+                        break;
+                case "vouch":
+                        //todo add vouch function
+                        break;
+                default: System.out.println("Error request not valid.");
+                         break;
+            }
+        }
+        
+        void sendList(Socket clientSock) {
+            
+        }
+        
+        private byte[] intToByteArray(int value) {
             return new byte[] {
                 (byte)(value >>> 24),
                 (byte)(value >>> 16),
