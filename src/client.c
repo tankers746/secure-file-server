@@ -29,6 +29,18 @@ void error(const char *msg)
     exit(1);
 }
 
+int sendRequest(int sock, char *request) {
+	char buffer[LENGTH];
+	memset(buffer, '\0', LENGTH);
+	strcpy(buffer, request);
+	if(send(sock, buffer, sizeof(buffer), 0) < 0) {
+        	fprintf(stderr, "ERROR: Failed to send file name. (errno = %d)\n", errno);
+        //return '\0';
+    	}
+	return EXIT_SUCCESS;
+
+}
+
 char *sendMetaData(char *path, int sock) {
     char *name;
     int size;
@@ -263,7 +275,11 @@ int main(int argc, char *argv[])
 	print_usage();
     }
     
-    enum { SEND_MODE, FETCH_MODE, VOUCH_MODE } mode;
+    char *downloads = "/Users/tom/downloads";
+
+    char request[LENGTH];
+    memset(request, '\0', LENGTH);
+
     int option = 0;
     int circumference = 0, port = 0;
     char *filepath, *hostname, *trustedname, certificate;
@@ -271,32 +287,36 @@ int main(int argc, char *argv[])
     //Specifying the expected options
     while ((option = getopt(argc, argv,"a:c:f:h:ln:u:v:")) != -1) {
         switch (option) {
-            case 'a' :
-                filepath = optarg;
-                mode = SEND_MODE;
+            case 'a' : //upload a file
+		snprintf(request, sizeof(request), "add");
+                sendRequest(sock, request); //tell server we're adding a file
+		sendFile(sock, optarg); //add file
                 break;
-            case 'c' :
+            case 'c' : //provide circumference
                 circumference = atoi(optarg);
                 break;
-            case 'f' :
-                filepath = optarg;
-                mode = FETCH_MODE;
+            case 'f' : //fetch a file
+                snprintf(request, sizeof(request), "fetch %s",optarg);
+                sendRequest(sock, request); 
+		receiveFile(sock, downloads);
                 break;
-            case 'h' :
+            case 'h' : //specify server address
                 hostname = strtok(optarg, ":");
                 port = atoi(strtok(NULL, ":"));
                 break;
-            case 'l' :
-                //todo create list all files method
-            case 'n' :
+            case 'l' : //list all files on server
+		snprintf(request, sizeof(request), "list");
+		sendRequest(sock, request); 
+		//todo create list all files method
+            case 'n' : //require name in circle
                 trustedname = optarg;
-            case 'u' :
+            case 'u' : //upload a cert
                 filepath = optarg;
-                mode = SEND_MODE;
                 break;
-            case 'v' :
+            case 'v' : //vouch
                 //todo create method to vouch
-                mode = VOUCH_MODE;
+                snprintf(request, sizeof(request), "vouch %s",optarg);
+		sendRequest(sock, request); 
                 break;
             default: print_usage();
                 exit(EXIT_FAILURE);
@@ -312,7 +332,6 @@ int main(int argc, char *argv[])
    
     
     
-    char *downloads = "/Users/tom/downloads";
     char *address = "192.168.15.108";
     char *path = "/Users/tom/desktop/audio-vga.m4v";
 
