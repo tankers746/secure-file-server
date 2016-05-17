@@ -34,7 +34,8 @@ int sendRequest(int sock, char *request) {
 	memset(buffer, '\0', LENGTH);
 	strcpy(buffer, request);
 	if(send(sock, buffer, sizeof(buffer), 0) < 0) {
-        	fprintf(stderr, "ERROR: Failed to send file name. (errno = %d)\n", errno);
+        	fprintf(stderr, "ERROR: Failed to send request. (errno = %d)\n", errno);
+		return EXIT_FAILURE;
         //return '\0';
     	}
 	return EXIT_SUCCESS;
@@ -275,30 +276,31 @@ int main(int argc, char *argv[])
 	print_usage();
     }
     
-    char *downloads = "/Users/tom/downloads";
+    char *downloads = "/Users/tom/desktop";
 
     char request[LENGTH];
     memset(request, '\0', LENGTH);
 
+    enum { SEND_MODE, FETCH_MODE, VOUCH_MODE, LIST_MODE } mode;
     int option = 0;
     int circumference = 0, port = 0;
-    char *filepath, *hostname, *trustedname, certificate;
+    char *fileName, *hostname, *trustedname, certificate;
 
     //Specifying the expected options
     while ((option = getopt(argc, argv,"a:c:f:h:ln:u:v:")) != -1) {
         switch (option) {
             case 'a' : //upload a file
 		snprintf(request, sizeof(request), "add");
-                sendRequest(sock, request); //tell server we're adding a file
-		sendFile(sock, optarg); //add file
+		fileName = optarg;
+                mode = SEND_MODE;
                 break;
             case 'c' : //provide circumference
                 circumference = atoi(optarg);
                 break;
             case 'f' : //fetch a file
                 snprintf(request, sizeof(request), "fetch %s",optarg);
-                sendRequest(sock, request); 
-		receiveFile(sock, downloads);
+      		fileName = optarg;
+		mode = FETCH_MODE;
                 break;
             case 'h' : //specify server address
                 hostname = strtok(optarg, ":");
@@ -306,50 +308,65 @@ int main(int argc, char *argv[])
                 break;
             case 'l' : //list all files on server
 		snprintf(request, sizeof(request), "list");
-		sendRequest(sock, request); 
+		mode = LIST_MODE;
 		//todo create list all files method
             case 'n' : //require name in circle
                 trustedname = optarg;
             case 'u' : //upload a cert
-                filepath = optarg;
+		snprintf(request, sizeof(request), "add");
+                fileName = optarg;
+		mode = SEND_MODE;
                 break;
             case 'v' : //vouch
                 //todo create method to vouch
                 snprintf(request, sizeof(request), "vouch %s",optarg);
-		sendRequest(sock, request); 
-                break;
+		mode = VOUCH_MODE;
+		break;
             default: print_usage();
                 exit(EXIT_FAILURE);
         }
     }
 
-    printf("filepath is %s\n", filepath);
+    /*printf("fileName is %s\n", filepath);
     printf("hostname is %s\n", hostname);
     printf("ports is %i\n", port);
-    printf("mode is %i\n", mode);
+    printf("mode is %i\n", mode);*/
     
     //---------------------
    
-    
-    
-    char *address = "192.168.15.108";
-    char *path = "/Users/tom/desktop/audio-vga.m4v";
 
     /* Variable Definition */
-    /*
-    int sockfd = connectServer(address, port);
-    
-    if(sendFile(sockfd,path) == EXIT_FAILURE) {
-        fprintf(stderr, "Failed to send file to server\n");
+
+    int sockfd = connectServer(hostname, port);
+    sendRequest(sockfd, request); 
+
+    int result;
+    switch (mode) {
+            case SEND_MODE : 
+		result = sendFile(sockfd, fileName);
+		break;
+            case FETCH_MODE : 
+		 result = receiveFile(sockfd, downloads);
+                break;
+            case LIST_MODE : 
+		//todo list function
+                break;
+            case VOUCH_MODE : 
+		//todo vouch function
+                break;
+            default: fprintf(stderr, "Please specify a send or receive argument.\n");
+    		exit(EXIT_FAILURE);
     }
-    
-    if(receiveFile(sockfd, downloads) == EXIT_FAILURE) {
-        fprintf(stderr, "Failed to receive file from server\n");
+
+       
+    if(result == EXIT_FAILURE) {
+        fprintf(stderr, "Failed to perform task from server\n");
+	exit(EXIT_FAILURE);
     }
     
     close(sockfd);
     printf("[Client] Connection lost.\n");
-    */
+    
     exit(EXIT_SUCCESS);
 }
 
