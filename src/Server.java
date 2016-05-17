@@ -93,7 +93,7 @@ public class Server extends Thread {
                         saveFile(sock);
                         break;
                 case "fetch":
-                        sendFile(sock, requestArgs[1]);
+                        sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
                         break;
                 case "list":  
                         sendList(sock);
