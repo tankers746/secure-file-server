@@ -17,7 +17,9 @@
 #include <math.h>
 #include <getopt.h>
 
-
+#include <resolv.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define LENGTH 1024
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -223,6 +225,22 @@ int receiveFile(int sock, char * downloadsFolder) {
     return EXIT_SUCCESS;
 }
 
+SSL_CTX* InitCTX(void)
+{   SSL_METHOD *method;
+    SSL_CTX *ctx;
+
+    OpenSSL_add_all_algorithms();		/* Load cryptos, et.al. */
+    SSL_load_error_strings();			/* Bring in and register error messages */
+    method = SSLv2_client_method();		/* Create new client-method instance */
+    ctx = SSL_CTX_new(method);			/* Create new context */
+    if ( ctx == NULL )
+    {
+        ERR_print_errors_fp(stderr);
+        abort();
+    }
+    return ctx;
+}
+
 int connectServer(char * serverAddr, int serverPort) {
     
     struct sockaddr_in remote_addr;
@@ -276,7 +294,7 @@ int main(int argc, char *argv[])
 	print_usage();
     }
     
-    char *downloads = "/Users/tom/desktop";
+    char *downloads = "/Users/Jason/Desktop/secure-file-server/downloads";
 
     char request[LENGTH];
     memset(request, '\0', LENGTH);
@@ -336,7 +354,6 @@ int main(int argc, char *argv[])
    
 
     /* Variable Definition */
-
     int sockfd = connectServer(hostname, port);
     sendRequest(sockfd, request); 
 
