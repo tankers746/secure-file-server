@@ -14,7 +14,7 @@ import java.net.Socket;
 public class Server extends Thread {
 	
         public static final int BUFFSIZE = 1024;
-        public final static String DOWNLOADS = "C:/Users/Tom/Documents";
+        public final static String DOWNLOADS = "C:/Users/Waleed/Documents";
 
         
 	private ServerSocket ss;
@@ -30,18 +30,52 @@ public class Server extends Thread {
 	public void run() {
                 
 		while (true) {
-                        System.out.println("Waiting for connection...");
+            System.out.println("Waiting for connection...");
 			try {
 				Socket clientSock = ss.accept();
-                                System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
-				saveFile(clientSock);
-                                sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
+                System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
+                getCommand(clientSock);
+//				saveFile(clientSock);
+//                sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
+	private String getCommand(Socket clientSock) throws IOException{
+		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
+		char command = dis.readChar();
+		switch (command){
+			case 'a':{
+				
+			}
+			case 'c':{
+				
+			}
+			case 'f':{
+				
+			}
+			case 'l':{
+				
+			}
+			case 'n':{
+				
+			}
+			case 'u':{
+				
+			}
+			case 'v':{
+				
+			}
+			default:{
+				dis.readUTF();
+				break;
+			}
+		}
+		return "";
+	}
+	
 	private void saveFile(Socket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
