@@ -48,25 +48,34 @@ public class Server extends Thread {
 		char command = dis.readChar();
 		switch (command){
 			case 'a':{
-				
+				saveFile(clientSock);
 			}
 			case 'c':{
-				
+				int circumference = dis.readInt();
+				setCircumference(clientSock, circumference);
 			}
 			case 'f':{
-				
+				String filename = dis.readUTF();
+				try{
+					sendFile(clientSock, createPath(filename));
+				} catch (IOException e){
+					e.printStackTrace();
+				}
 			}
 			case 'l':{
-				
+				sendList(clientSock);
 			}
 			case 'n':{
-				
+				String pname = dis.readUTF();
+				setPersonInCircle(clientSock, pname);
 			}
 			case 'u':{
-				
+				saveFile(clientSock);
 			}
 			case 'v':{
-				
+				String filename = dis.readUTF();
+				saveFile(clientSock); //The certificate's a file?
+				setCertificateForFile(clientSock, filename);
 			}
 			default:{
 				dis.readUTF();
@@ -74,6 +83,27 @@ public class Server extends Thread {
 			}
 		}
 		return "";
+	}
+	
+	private void setCertificateForFile(Socket clientSock, String filename){
+		
+	}
+	
+	private void setPersonInCircle(Socket clientSock, String pname){
+		
+	}
+	
+	private void sendList(Socket clientSock){
+		
+	}
+	
+	private String createPath(String filename){
+		String path = "";
+		return path;
+	}
+	
+	private void setCircumference(Socket clientSock, int circ){
+		
 	}
 	
 	private void saveFile(Socket clientSock) throws IOException {
