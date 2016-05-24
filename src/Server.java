@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
 
 
 public class Server extends Thread {
@@ -28,7 +29,7 @@ public class Server extends Thread {
 	}
 	
 	public void run() {
-                
+//        createPath("file1.txt");
 		while (true) {
             System.out.println("Waiting for connection...");
 			try {
@@ -98,7 +99,10 @@ public class Server extends Thread {
 	}
 	
 	private String createPath(String filename){
-		String path = "";
+		URL loc = Server.class.getProtectionDomain().getCodeSource().getLocation();
+		String cloc = loc.toString();
+		String path = cloc + "filestore";
+		System.out.println(path);
 		return path;
 	}
 	
@@ -188,6 +192,7 @@ public class Server extends Thread {
 
                 //Closing socket
                 //os.close();
+                dis.close();
                 dos.close();           
         }
 	
