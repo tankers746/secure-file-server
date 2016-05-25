@@ -16,10 +16,9 @@
 #include <limits.h>
 #include <math.h>
 #include <getopt.h>
+#include <fcntl.h>
 
-#include <resolv.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
+
 
 #define LENGTH 1024
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -28,7 +27,7 @@
 void error(const char *msg)
 {
     perror(msg);
-    exit(1);
+    exit(EXIT_SUCCESS);
 }
 
 int sendRequest(int sock, char *request) {
@@ -225,53 +224,100 @@ int receiveFile(int sock, char * downloadsFolder) {
     return EXIT_SUCCESS;
 }
 
-SSL_CTX* InitCTX(void)
-{   SSL_METHOD *method;
-    SSL_CTX *ctx;
-
-    OpenSSL_add_all_algorithms();		/* Load cryptos, et.al. */
-    SSL_load_error_strings();			/* Bring in and register error messages */
-    method = SSLv2_client_method();		/* Create new client-method instance */
-    ctx = SSL_CTX_new(method);			/* Create new context */
-    if ( ctx == NULL )
-    {
-        ERR_print_errors_fp(stderr);
-        abort();
-    }
-    return ctx;
-}
-
 int connectServer(char * serverAddr, int serverPort) {
-    
-    struct sockaddr_in remote_addr;
+    int timeout = 15;	
+    int res; 
+    struct sockaddr_in addr; 
+    long arg; 
+    fd_set myset; 
+    struct timeval tv; 
+    int valopt; 
+    socklen_t lon;     
     int sock;
     
     /* Get the Socket file descriptor */
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         fprintf(stderr, "ERROR: Failed to obtain Socket Descriptor! (errno = %d)\n",errno);
-        exit(EXIT_FAILURE);
+        exit(-1);
     }
     
     /* Fill the socket address struct */
-    remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = htons(serverPort);
-    inet_pton(AF_INET, serverAddr, &remote_addr.sin_addr);
-    memset(&(remote_addr.sin_zero),'\0',8);
-    
-    /* Try to connect the remote */
-    if (connect(sock, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr)) == -1)
-    {
-        fprintf(stderr, "ERROR: Failed to connect to the host! (errno = %d)\n",errno);
-        exit(EXIT_FAILURE);
-    }
-    else {
-        
-        printf("[Client] Connected to server at port %d...ok!\n", serverPort);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(serverPort);
+    inet_pton(AF_INET, serverAddr, &addr.sin_addr);
+    memset(&(addr.sin_zero),'\0',8);
+
+//----------------------- Timeout from http://developerweb.net/viewtopic.php?id=3196
+
+  // Set non-blocking 
+  if( (arg = fcntl(sock, F_GETFL, NULL)) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_GETFL) (%s)\n", strerror(errno)); 
+     exit(-1); 
+  } 
+  arg |= O_NONBLOCK; 
+  if( fcntl(sock, F_SETFL, arg) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
+     exit(-1); 
+  } 
+  // Trying to connect with timeout 
+  res = connect(sock, (struct sockaddr *)&addr, sizeof(addr)); 
+  if (res < 0) { 
+     if (errno == EINPROGRESS) { 
+        fprintf(stderr, "Attempting to connect to %s on port %i...\n",serverAddr, serverPort ); 
+        do { 
+           tv.tv_sec = timeout; 
+           tv.tv_usec = 0; 
+           FD_ZERO(&myset); 
+           FD_SET(sock, &myset); 
+           res = select(sock+1, NULL, &myset, NULL, &tv); 
+           if (res < 0 && errno != EINTR) { 
+              fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno)); 
+              exit(-1); 
+           } 
+           else if (res > 0) { 
+              // Socket selected for write 
+              lon = sizeof(int); 
+              if (getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) { 
+                 fprintf(stderr, "Error in getsockopt() %d - %s\n", errno, strerror(errno)); 
+                 exit(-1); 
+              } 
+              // Check the value returned... 
+              if (valopt) { 
+                 fprintf(stderr, "Error in delayed connection() %d - %s\n", valopt, strerror(valopt) 
+); 
+                 exit(-1); 
+              } 
+              break; 
+           } 
+           else { 
+              fprintf(stderr, "Connection timed out, check that the server is running.\n"); 
+              exit(-1); 
+           } 
+        } while (1); 
+     } 
+     else { 
+        fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno)); 
+        exit(EXIT_FAILURE); 
+     } 
+  } 
+  // Set to blocking mode again... 
+  if( (arg = fcntl(sock, F_GETFL, NULL)) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_GETFL) (%s)\n", strerror(errno)); 
+     exit(-1); 
+  } 
+  arg &= (~O_NONBLOCK); 
+  if( fcntl(sock, F_SETFL, arg) < 0) { 
+     fprintf(stderr, "Error fcntl(..., F_SETFL) (%s)\n", strerror(errno)); 
+     exit(-1); 
+  } 
+
+
+    printf("[Client] Connected to server at port %d...ok!\n", serverPort);
         return sock;
-    }
-    
 }
+    
+
 
 void print_usage() {
     printf("Usage:\n");
@@ -290,16 +336,16 @@ void print_usage() {
 int main(int argc, char *argv[])
 {
     if(argc == 1) {
-    	printf("Error no arguments\n");
-	print_usage();
+    	printf("Error no arguments type -help for usage.\n");
+	exit(EXIT_FAILURE);
     }
-    
-    char *downloads = "/Users/Jason/Desktop/secure-file-server/downloads";
+    int sockfd;
+    char *downloads = "/Users/tom/desktop";
 
     char request[LENGTH];
     memset(request, '\0', LENGTH);
 
-    enum { SEND_MODE, FETCH_MODE, VOUCH_MODE, LIST_MODE } mode;
+    enum { SEND_MODE, FETCH_MODE, VOUCH_MODE, LIST_MODE, DEFAULT_MODE } mode = DEFAULT_MODE;
     int option = 0;
     int circumference = 0, port = 0;
     char *fileName, *hostname, *trustedname, certificate;
@@ -322,7 +368,8 @@ int main(int argc, char *argv[])
                 break;
             case 'h' : //specify server address
                 hostname = strtok(optarg, ":");
-                port = atoi(strtok(NULL, ":"));
+                char *temp = strtok(NULL, ":");
+		if(temp != NULL) port = atoi(temp);
                 break;
             case 'l' : //list all files on server
 		snprintf(request, sizeof(request), "list");
@@ -340,6 +387,10 @@ int main(int argc, char *argv[])
                 snprintf(request, sizeof(request), "vouch %s",optarg);
 		mode = VOUCH_MODE;
 		break;
+	    case 'help' : //print usage
+		print_usage();
+		exit(EXIT_SUCCESS);
+		break;
             default: print_usage();
                 exit(EXIT_FAILURE);
         }
@@ -354,7 +405,15 @@ int main(int argc, char *argv[])
    
 
     /* Variable Definition */
-    int sockfd = connectServer(hostname, port);
+    if(hostname == NULL || port == 0) {
+    	fprintf(stderr, "Please specify a hostname and port, type -help for usage\n");
+	exit(EXIT_FAILURE);
+    }
+
+    if((sockfd = connectServer(hostname, port)) == -1) {
+    	fprintf(stderr,"Unable to connect to the server.\n");
+	exit(EXIT_FAILURE);
+    }
     sendRequest(sockfd, request); 
 
     int result;
@@ -371,13 +430,13 @@ int main(int argc, char *argv[])
             case VOUCH_MODE : 
 		//todo vouch function
                 break;
-            default: fprintf(stderr, "Please specify a send or receive argument.\n");
+            case DEFAULT_MODE: fprintf(stderr, "Please specify a send or receive argument, type -help for usage.\n");
     		exit(EXIT_FAILURE);
     }
 
        
     if(result == EXIT_FAILURE) {
-        fprintf(stderr, "Failed to perform task from server\n");
+        fprintf(stderr, "Failed to perform task.\n");
 	exit(EXIT_FAILURE);
     }
     
