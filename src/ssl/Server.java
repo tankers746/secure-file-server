@@ -14,6 +14,7 @@ import java.security.KeyStore;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 
 
 public class Server extends Thread {
@@ -55,7 +56,7 @@ public class Server extends Thread {
 		while (true) {
                         System.out.println("Waiting for connection...");
 			try {
-				Socket clientSock = ss.accept();
+				SSLSocket clientSock = (SSLSocket) ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
 				serveClient(clientSock);
 			} catch (IOException e) {
@@ -64,7 +65,7 @@ public class Server extends Thread {
 		}
 	}
 
-	private void saveFile(Socket clientSock) throws IOException {
+	private void saveFile(SSLSocket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
@@ -109,7 +110,7 @@ public class Server extends Thread {
 		//dis.close();
 	}
         
-        private void serveClient(Socket sock) throws IOException {
+        private void serveClient(SSLSocket sock) throws IOException {
             DataInputStream dis = new DataInputStream(sock.getInputStream());
             byte[] buffer = new byte[BUFFSIZE];
             dis.read(buffer, 0, BUFFSIZE);
@@ -139,7 +140,7 @@ public class Server extends Thread {
             }
         }
         
-        void sendList(Socket clientSock) {
+        void sendList(SSLSocket clientSock) {
             
         }
         
@@ -151,7 +152,7 @@ public class Server extends Thread {
                 (byte)value};
         }
         
-        private void sendFile(Socket clientSock, String path) throws IOException {
+        private void sendFile(SSLSocket clientSock, String path) throws IOException {
                 File myFile = new File(path);  
                 byte[] mybytearray = new byte[(int) myFile.length()];  
 
