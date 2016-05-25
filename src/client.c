@@ -224,31 +224,6 @@ int receiveFile(SSL *ssl, char * downloadsFolder) {
     return EXIT_SUCCESS;
 }
 
-
-
-    //Added the LoadCertificates how in the server-side makes.    
-void LoadCertificates(SSL_CTX* ctx, char* CertFile, char* KeyFile)
-{
- /* set the local certificate from CertFile */
-    if ( SSL_CTX_use_certificate_file(ctx, CertFile, SSL_FILETYPE_PEM) <= 0 )
-    {
-        ERR_print_errors_fp(stderr);
-        abort();
-    }
-    /* set the private key from KeyFile (may be the same as CertFile) */
-    if ( SSL_CTX_use_PrivateKey_file(ctx, KeyFile, SSL_FILETYPE_PEM) <= 0 )
-    {
-        ERR_print_errors_fp(stderr);
-        abort();
-    }
-    /* verify private key */
-    if ( !SSL_CTX_check_private_key(ctx) )
-    {
-        fprintf(stderr, "Private key does not match the public certificate\n");
-        abort();
-    }
-}
-
 SSL_CTX* InitCTX(void)
 {   SSL_METHOD *method;
     SSL_CTX *ctx;
@@ -287,13 +262,9 @@ void ShowCerts(SSL* ssl)
 
 SSL *createSSL(int sock, SSL_CTX *ctx) {
     SSL *ssl;
-    char CertFile[] = "/users/tom/downloads/certificate.pem";
-    char KeyFile[] = "/users/tom/downloads/key.pem";
-
     SSL_library_init();
 
     ctx = InitCTX();
-    LoadCertificates(ctx, CertFile, KeyFile);
     ssl = SSL_new(ctx);      /* create new SSL connection state */
     SSL_set_fd(ssl, sock);    /* attach the socket descriptor */
     if ( SSL_connect(ssl) == -1 )   /* perform the connection */
@@ -308,11 +279,6 @@ SSL *createSSL(int sock, SSL_CTX *ctx) {
     }   
 
 }
-
-
-
-
-
 
 int connectServer(char * serverAddr, int serverPort) {
     int timeout = 15;	
