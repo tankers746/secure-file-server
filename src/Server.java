@@ -1,6 +1,7 @@
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -46,7 +47,14 @@ public class Server extends Thread {
 		byte[] buffer = new byte[BUFFSIZE];
 
                 int filesize =  0;
+                
+            try {
                 filesize = dis.readInt();
+            } catch (EOFException e) {
+                System.err.println("No filesize received from client");
+                return;
+            }
+               
                 System.out.println("Filesize is " + filesize);
                 dis.read(buffer, 0, BUFFSIZE);
                 String fileName = new String(buffer).split("\0")[0];
