@@ -336,7 +336,7 @@ void print_usage() {
 int main(int argc, char *argv[])
 {
     if(argc == 1) {
-    	printf("Error no arguments type -help for usage.\n");
+    	printf("Error no arguments type -? for usage.\n");
 	exit(EXIT_FAILURE);
     }
     int sockfd;
@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
     char *fileName, *hostname, *trustedname, certificate;
 
     //Specifying the expected options
-    while ((option = getopt(argc, argv,"a:c:f:h:ln:u:v:")) != -1) {
+    while ((option = getopt(argc, argv,"a:c:f:h:ln:u:v:?")) != -1) {
         switch (option) {
             case 'a' : //upload a file
 		snprintf(request, sizeof(request), "add");
@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
                 snprintf(request, sizeof(request), "vouch %s",optarg);
 		mode = VOUCH_MODE;
 		break;
-	    case 'help' : //print usage
+	    case '?' : //print usage
 		print_usage();
 		exit(EXIT_SUCCESS);
 		break;
@@ -406,7 +406,7 @@ int main(int argc, char *argv[])
 
     /* Variable Definition */
     if(hostname == NULL || port == 0) {
-    	fprintf(stderr, "Please specify a hostname and port, type -help for usage\n");
+    	fprintf(stderr, "Please specify a hostname and port, type -? for usage\n");
 	exit(EXIT_FAILURE);
     }
 
@@ -430,7 +430,7 @@ int main(int argc, char *argv[])
             case VOUCH_MODE : 
 		//todo vouch function
                 break;
-            case DEFAULT_MODE: fprintf(stderr, "Please specify a send or receive argument, type -help for usage.\n");
+            case DEFAULT_MODE: fprintf(stderr, "Please specify a send or receive argument, type -? for usage.\n");
     		exit(EXIT_FAILURE);
     }
 
