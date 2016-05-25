@@ -414,6 +414,8 @@ int main(int argc, char *argv[])
     	fprintf(stderr,"Unable to connect to the server.\n");
 	exit(EXIT_FAILURE);
     }
+		
+    sslInitialise();
     sendRequest(sockfd, request); 
 
     int result;
