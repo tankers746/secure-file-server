@@ -35,8 +35,6 @@ public class Server extends Thread {
 				Socket clientSock = ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
 				serveClient(clientSock);
-                                //saveFile(clientSock);
-                                //sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -85,6 +83,11 @@ public class Server extends Thread {
             DataInputStream dis = new DataInputStream(sock.getInputStream());
             byte[] buffer = new byte[BUFFSIZE];
             dis.read(buffer, 0, BUFFSIZE);
+            
+            if(buffer[0] == 0) {
+                System.out.println("No request received from client.");
+                return;
+            }
             String request = new String(buffer).split("\0")[0];
             String[] requestArgs = request.split(" ");
             System.out.println("Request is " + request);
