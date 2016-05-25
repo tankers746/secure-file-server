@@ -14,8 +14,9 @@ import java.net.URL;
 
 public class Server extends Thread {
 	
-        public static final int BUFFSIZE = 1024;
-        public final static String DOWNLOADS = "C:/Users/Waleed/Documents";
+    public static final int BUFFSIZE = 1024;
+    public final static String DOWNLOADS = "C:/Users/Waleed/Documents";
+    private FileTable fileTable;
 
         
 	private ServerSocket ss;
@@ -26,6 +27,7 @@ public class Server extends Thread {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		this.fileTable = new FileTable();
 	}
 	
 	public void run() {
