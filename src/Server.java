@@ -10,10 +10,14 @@ import java.io.OutputStream;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
-import static java.lang.Math.round;
+import java.security.KeyStore;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 
 
-public class Server_orig extends Thread {
+public class Server extends Thread {
 	
         public static final int BUFFSIZE = 1024;
         public final static String DOWNLOADS = "C:/Users/Tom/Documents";
@@ -21,10 +25,28 @@ public class Server_orig extends Thread {
         
 	private ServerSocket ss;
 	
-	public Server_orig(int port) {
+	public Server(int port) {
 		try {
-			ss = new ServerSocket(port);
-		} catch (IOException e) {
+                    SSLContext context;
+                    KeyManagerFactory kmf;
+                    KeyStore ks;
+                    
+                    char[] storepass = "password".toCharArray();
+                    char[] keypass = "password".toCharArray();
+                    String storepath = "C:/Users/Tom/OneDrive/Documents/NetBeansProjects/secure-file-server/src/server.pks";
+
+                    context = SSLContext.getInstance("TLS");
+                    kmf = KeyManagerFactory.getInstance("SunX509");
+                    ks = KeyStore.getInstance("JKS");
+                    ks.load(new FileInputStream(storepath), storepass);
+
+                    kmf.init(ks, keypass);
+                    context.init(kmf.getKeyManagers(), null, null);
+                    SSLServerSocketFactory ssf = context.getServerSocketFactory();
+
+                    ss = ssf.createServerSocket(port);
+                    
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
@@ -34,7 +56,7 @@ public class Server_orig extends Thread {
 		while (true) {
                         System.out.println("Waiting for connection...");
 			try {
-				Socket clientSock = ss.accept();
+				SSLSocket clientSock = (SSLSocket) ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
 				serveClient(clientSock);
 			} catch (IOException e) {
@@ -43,7 +65,7 @@ public class Server_orig extends Thread {
 		}
 	}
 
-	private void saveFile(Socket clientSock) throws IOException {
+	private void saveFile(SSLSocket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
@@ -88,7 +110,7 @@ public class Server_orig extends Thread {
 		//dis.close();
 	}
         
-        private void serveClient(Socket sock) throws IOException {
+        private void serveClient(SSLSocket sock) throws IOException {
             DataInputStream dis = new DataInputStream(sock.getInputStream());
             byte[] buffer = new byte[BUFFSIZE];
             dis.read(buffer, 0, BUFFSIZE);
@@ -118,7 +140,7 @@ public class Server_orig extends Thread {
             }
         }
         
-        void sendList(Socket clientSock) {
+        void sendList(SSLSocket clientSock) {
             
         }
         
@@ -130,7 +152,7 @@ public class Server_orig extends Thread {
                 (byte)value};
         }
         
-        private void sendFile(Socket clientSock, String path) throws IOException {
+        private void sendFile(SSLSocket clientSock, String path) throws IOException {
                 File myFile = new File(path);  
                 byte[] mybytearray = new byte[(int) myFile.length()];  
 
@@ -165,11 +187,12 @@ public class Server_orig extends Thread {
 
                 //Closing socket
                 //os.close();
+                fis.close();
                 dos.close();           
         }
 	
 	public static void main(String[] args) {
-		Server_orig fs = new Server_orig(1342);
+		Server fs = new Server(1342);
 		fs.start();
 	}
 
