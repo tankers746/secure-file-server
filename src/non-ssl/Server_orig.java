@@ -10,9 +10,10 @@ import java.io.OutputStream;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
+import static java.lang.Math.round;
 
 
-public class Server extends Thread {
+public class Server_orig extends Thread {
 	
         public static final int BUFFSIZE = 1024;
         public final static String DOWNLOADS = "C:/Users/Tom/Documents";
@@ -20,7 +21,7 @@ public class Server extends Thread {
         
 	private ServerSocket ss;
 	
-	public Server(int port) {
+	public Server_orig(int port) {
 		try {
 			ss = new ServerSocket(port);
 		} catch (IOException e) {
@@ -168,7 +169,7 @@ public class Server extends Thread {
         }
 	
 	public static void main(String[] args) {
-		Server fs = new Server(1342);
+		Server_orig fs = new Server_orig(1342);
 		fs.start();
 	}
 

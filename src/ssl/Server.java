@@ -1,84 +1,66 @@
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyStore;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
 
-import javax.net.ssl.*;
-import java.security.*;
-import java.security.cert.CertificateException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-public class Server_ssl extends Thread {
+public class Server extends Thread {
 	
         public static final int BUFFSIZE = 1024;
-        public final static String DOWNLOADS = "C:/Users/Jason/Desktop/Server";
+        public final static String DOWNLOADS = "C:/Users/Tom/Documents";
+
         
 	private ServerSocket ss;
 	
-	public Server_ssl(int port) {
+	public Server(int port) {
 		try {
-                        //Create a SSL Server socket from a default SSLServerSocketFactory
-                                SSLContext context;
-                                KeyManagerFactory kmf;
-                                KeyStore ks;
-                                char[] storepass = "password".toCharArray();
-                                char[] keypass = "password".toCharArray();
-                                String storepath = "C:/Users/Tom/OneDrive/Documents/NetBeansProjects/secure-file-server/src/server.pks";
+                    SSLContext context;
+                    KeyManagerFactory kmf;
+                    KeyStore ks;
+                    
+                    char[] storepass = "password".toCharArray();
+                    char[] keypass = "password".toCharArray();
+                    String storepath = "C:/Users/Tom/OneDrive/Documents/NetBeansProjects/secure-file-server/src/ssl/server.pks";
 
-                                context = SSLContext.getInstance("TLS");
-                                kmf = KeyManagerFactory.getInstance("SunX509");
-                                ks = KeyStore.getInstance("JKS");
-                                ks.load(new FileInputStream(storepath), storepass);
+                    context = SSLContext.getInstance("TLS");
+                    kmf = KeyManagerFactory.getInstance("SunX509");
+                    ks = KeyStore.getInstance("JKS");
+                    ks.load(new FileInputStream(storepath), storepass);
 
-                                kmf.init(ks, keypass);
-                                context.init(kmf.getKeyManagers(), null, null);
-                                SSLServerSocketFactory ssf = context.getServerSocketFactory();
+                    kmf.init(ks, keypass);
+                    context.init(kmf.getKeyManagers(), null, null);
+                    SSLServerSocketFactory ssf = context.getServerSocketFactory();
 
-                                ss = ssf.createServerSocket(port);
-
+                    ss = ssf.createServerSocket(port);
+                    
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-// Create a trust manager that does not validate certificate chains
-    TrustManager[] trustAllCerts = new TrustManager[] {
-            new X509TrustManager() {
-                public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                }
-
-                public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                }
-
-                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-            }
-    };
-
 	
 	public void run() {
                 
 		while (true) {
                         System.out.println("Waiting for connection...");
-			try {                            
-                                Socket clientSock = ss.accept();
-                                        
+			try {
+				Socket clientSock = ss.accept();
                                 System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
-				//serveClient(sslsocket);
-                                saveFile(clientSock);
-                                //sendFile(clientSock,"C:/Users/Tom/Desktop/audio-vga (6).m4v");
+				serveClient(clientSock);
 			} catch (IOException e) {
 				e.printStackTrace();
-                        }
+			}
 		}
 	}
 
@@ -86,14 +68,21 @@ public class Server_ssl extends Thread {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
-                //int filesize =  0;
-                //filesize = dis.readInt();
-                //System.out.println("Filesize is " + filesize);
+                int filesize =  0;
+                
+            try {
+                filesize = dis.readInt();
+            } catch (EOFException e) {
+                System.err.println("No filesize received from client");
+                return;
+            }
+               
+                System.out.println("Filesize is " + filesize);
                 dis.read(buffer, 0, BUFFSIZE);
                 String fileName = new String(buffer).split("\0")[0];
-                System.out.println(fileName);
+                System.out.println("Filename is " + fileName);
                 
-                /*int read = 0;
+                int read = 0;
 		int totalRead = 0;
 		int remaining = filesize;
                 
@@ -116,14 +105,19 @@ public class Server_ssl extends Thread {
 		}
                 System.out.println("\nFile saved in " + DOWNLOADS + '/' + fileName);
 		
-		fos.close(); */
+		fos.close();
 		//dis.close();
 	}
         
-        private void serveClient(SSLSocket sock) throws IOException {
+        private void serveClient(Socket sock) throws IOException {
             DataInputStream dis = new DataInputStream(sock.getInputStream());
             byte[] buffer = new byte[BUFFSIZE];
             dis.read(buffer, 0, BUFFSIZE);
+            
+            if(buffer[0] == 0) {
+                System.out.println("No request received from client.");
+                return;
+            }
             String request = new String(buffer).split("\0")[0];
             String[] requestArgs = request.split(" ");
             System.out.println("Request is " + request);
@@ -157,7 +151,7 @@ public class Server_ssl extends Thread {
                 (byte)value};
         }
         
-        private void sendFile(SSLSocket clientSock, String path) throws IOException {
+        private void sendFile(Socket clientSock, String path) throws IOException {
                 File myFile = new File(path);  
                 byte[] mybytearray = new byte[(int) myFile.length()];  
 
@@ -196,7 +190,7 @@ public class Server_ssl extends Thread {
         }
 	
 	public static void main(String[] args) {
-		Server_ssl fs = new Server_ssl(1342);
+		Server fs = new Server(1342);
 		fs.start();
 	}
 
