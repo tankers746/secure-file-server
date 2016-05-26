@@ -100,8 +100,8 @@ public class Server extends Thread {
 		this.fileTable.addCertificate(filename, certificate);
 	}
 	
-	private void setPersonInCircle(Socket clientSock, String pname){
-		
+	private void setPersonInCircle(String pname){
+		this.person = pname;
 	}
 	
 	private void sendList(Socket clientSock){
