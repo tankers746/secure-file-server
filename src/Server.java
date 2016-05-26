@@ -1,3 +1,4 @@
+//<<<<<<< HEAD
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -116,6 +117,7 @@ public class Server extends Thread {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
+		
                 int filesize =  0;
                 filesize = dis.readInt();
                 System.out.println("Filesize is " + filesize);
@@ -202,5 +204,4 @@ public class Server extends Thread {
 		Server fs = new Server(1342);
 		fs.start();
 	}
-
 }
