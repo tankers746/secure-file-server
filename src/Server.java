@@ -116,8 +116,8 @@ public class Server extends Thread {
 		return path;
 	}
 	
-	private void setCircumference(Socket clientSock, int circ){
-		
+	private void setCircumference(int circ){
+		this.circumference = circ;
 	}
 	
 	private void saveFile(Socket clientSock) throws IOException {
