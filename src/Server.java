@@ -80,8 +80,9 @@ public class Server extends Thread {
 			}
 			case 'v':{
 				String filename = dis.readUTF();
-				saveFile(clientSock); //The certificate's a file?
-				setCertificateForFile(clientSock, filename);
+				String certificate = dis.readUTF();
+//				saveFile(clientSock); //The certificate's a file?
+				setCertificateForFile(filename, certificate);
 			}
 			default:{
 				dis.readUTF();
@@ -95,8 +96,8 @@ public class Server extends Thread {
 		this.fileTable.addFile(filename);
 	}
 	
-	private void setCertificateForFile(Socket clientSock, String filename){
-		
+	private void setCertificateForFile(String filename, String certificate){
+		this.fileTable.addCertificate(filename, certificate);
 	}
 	
 	private void setPersonInCircle(Socket clientSock, String pname){
