@@ -11,6 +11,7 @@ import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
+import java.util.ArrayList;
 
 
 public class Server extends Thread {
@@ -58,7 +59,7 @@ public class Server extends Thread {
 			}
 			case 'c':{
 				int circumference = dis.readInt();
-				setCircumference(clientSock, circumference);
+				setCircumference(circumference);
 			}
 			case 'f':{
 				String filename = dis.readUTF();
@@ -73,7 +74,7 @@ public class Server extends Thread {
 			}
 			case 'n':{
 				String pname = dis.readUTF();
-				setPersonInCircle(clientSock, pname);
+				setPersonInCircle(pname);
 			}
 			case 'u':{
 				saveFile(clientSock);
@@ -90,6 +91,77 @@ public class Server extends Thread {
 			}
 		}
 		return "";
+	}
+	
+	private boolean checkCircle(String filename){
+		if (this.circumference == 0) return true; //Always true if circumference is 0
+		ArrayList<String> fileCerts = this.fileTable.getList(filename);
+		if (this.person != null){
+			boolean pavailable = false;
+			for (String cert: fileCerts){
+				if (cert.equals(this.person)){
+					pavailable = true;
+				}
+			}
+			if (pavailable == false) return false;
+		}
+//		ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
+		ArrayList<String> circle = findCircle(fileCerts);
+		return false;
+	}
+	
+	private ArrayList<String> findCircle(ArrayList<String> fileCerts){
+		ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
+		ArrayList<ArrayList<String>> newList = new ArrayList<>();
+		
+		for (ArrayList<String> mlist: masterList){
+			if (mlist.size() == this.circumference || mlist.size() == (this.circumference-1)){
+				newList.add(mlist);
+			}
+		}
+		
+		for (ArrayList<String> nlist: newList){
+			String first = nlist.get(0);
+			String last = nlist.get(nlist.size() - 1);
+			if (first.equals(last)){ //if a closed loop is formed
+				if (this.person != null){
+					if (nlist.contains(this.person)){ //if the closed loop contains the required person
+						return nlist;
+					}
+				}
+				else{
+					return nlist;
+				}
+			}
+		}
+		
+		return null;
+	}
+	
+	private ArrayList<ArrayList<String>> getCircles(ArrayList<String> certs){
+//		The algorithm assumes that each certificate is signed by a max of one person
+		ArrayList<ArrayList<String>> masterList = new ArrayList<>();
+		for (String cert: certs){
+			String n = null;
+			String t = cert;
+			ArrayList<String> list = new ArrayList<>();
+			list.add(t);
+			while (true){
+//				n = t.getSignee();
+				if (n == null) break; //In case the cert is not signed by any one - circle breaks
+//				if (list.contains(n)) break; //If the list already contains a name, a closed loop has been formed
+				if (list.contains(n)){ //If the list already contains a name, a closed loop is found
+					if (n.equals(cert)){
+						list.add(cert); //If the loop closes on the first element
+					}
+					break;
+				}
+				list.add(n);
+				t = n;
+			}
+			masterList.add(list);
+		}
+		return masterList;
 	}
 	
 	private void addFileToList(String filename){
