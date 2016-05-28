@@ -225,16 +225,16 @@ int receiveFile(SSL *ssl, char * downloadsFolder) {
 }
 
 SSL_CTX* InitCTX(void)
-{   SSL_METHOD *method;
+{   const SSL_METHOD *method;
     SSL_CTX *ctx;
 
     OpenSSL_add_all_algorithms();  /* Load cryptos, et.al. */
     SSL_load_error_strings();   /* Bring in and register error messages */
-    method = TLSv1_2_client_method();  /* Create new client-method instance */
+    method = SSLv23_client_method();  /* Create new client-method instance */
     ctx = SSL_CTX_new(method);   /* Create new context */
     if ( ctx == NULL )
     {
-        ERR_print_errors_fp(stderr);
+        fprintf(stderr, "Unable to create a new SSL context structure.\n");
         abort();
     }
     return ctx;
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
     int sockfd;
     SSL_CTX *ctx;
 
-    char *downloads = "/Users/tom/desktop";
+    char *downloads = "/Users/Jason/Desktop/secure-file-server/downloads";
 
     char request[LENGTH];
     memset(request, '\0', LENGTH);
@@ -453,13 +453,6 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
         }
     }
-
-    /*printf("fileName is %s\n", filepath);
-    printf("hostname is %s\n", hostname);
-    printf("ports is %i\n", port);
-    printf("mode is %i\n", mode);*/
-    
-    //---------------------
    
 
     /* Variable Definition */
