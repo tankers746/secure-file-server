@@ -178,11 +178,11 @@ public class Server extends Thread {
                             sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                             return;
                         }
+                        sendResult(sock, "File is on the server");
                         successful = saveFile(sock);
                         if(successful) {
                             certOwner = processCert(requestArgs[2]);
                             if(certOwner == null) {
-                                System.err.println("");
                                 sendResult(sock, "ERROR: Unable to get cert owner");
                                 return;
                             }
@@ -193,8 +193,7 @@ public class Server extends Thread {
                             } else {
                                 sendResult(sock, "ERROR: Unable to vouch for " + requestArgs[1]);
                             }
-                        }
-                        sendResult(sock, "ERROR: Unable to save certificate.");
+                        } else sendResult(sock, "ERROR: Unable to save certificate.");
                         break;
                 default: System.err.println("Error request not valid.");
                          break;
@@ -231,7 +230,6 @@ public class Server extends Thread {
                 System.out.println(msg);
                 dos.write(message.getBytes(), 0, BUFFSIZE);         
                 dos.flush();  
-                dos.close(); 
             } catch(Exception e) {
                 return;    
             }
