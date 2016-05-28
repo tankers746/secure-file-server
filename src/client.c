@@ -472,12 +472,7 @@ int main(int argc, char *argv[])
             default: print_usage();
                 exit(EXIT_FAILURE);
         }
-<<<<<<< HEAD
-    }   
-=======
-    }
-   
->>>>>>> origin/master
+}
 
     /* Variable Definition */
     if(hostname == NULL || port == 0) {
