@@ -29,13 +29,10 @@ import javax.naming.ldap.Rdn;
 public class Server extends Thread {
 	
         public static final int BUFFSIZE = 1024;
-<<<<<<< HEAD
-        public final static String DOWNLOADS = "C:/Users/Tom/Documents";
+        public final static String DOWNLOADS = "Files";
         public final static String CERTSTORE = "Certificates";        
+        public final static String STOREPATH = "server.jks"; 
         
-=======
-        public final static String DOWNLOADS = "C:/Users/Jason/Desktop/Server";        
->>>>>>> origin/master
 	private ServerSocket ss;
         public static KeyStore ks;
 	
@@ -46,13 +43,12 @@ public class Server extends Thread {
                     
                     char[] storepass = "password".toCharArray();
                     char[] keypass = "password".toCharArray();
-                    String storepath = "server.jks";
                     
                     /*Initialize and load the java keystore*/
                     context = SSLContext.getInstance("TLS");
                     kmf = KeyManagerFactory.getInstance("SunX509");
                     ks = KeyStore.getInstance("JKS");
-                    ks.load(new FileInputStream(storepath), storepass);
+                    ks.load(new FileInputStream(STOREPATH), storepass);
                     kmf.init(ks, keypass);
                     context.init(kmf.getKeyManagers(), null, null);
                     
@@ -79,7 +75,7 @@ public class Server extends Thread {
 		}
 	}
 
-	private void saveFile(SSLSocket clientSock) throws IOException {
+	private boolean saveFile(SSLSocket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
@@ -89,7 +85,7 @@ public class Server extends Thread {
                 filesize = dis.readInt();
             } catch (EOFException e) {
                 System.err.println("No filesize received from client");
-                return;
+                return false;
             }
                
                 System.out.println("Filesize is " + filesize);
@@ -119,13 +115,15 @@ public class Server extends Thread {
                         
 		}
                 if(totalRead < filesize) {
-                    System.err.println("\nFile transfer was unsuccessful.");
+                    System.err.println("File transfer was unsuccessful.");
                     fos.close();
                     Path p = Paths.get(DOWNLOADS + '/' + fileName);
-                    Files.delete(p);                    
+                    Files.delete(p); 
+                    return false;
                 } else {
-                    System.out.println("\nFile saved in " + DOWNLOADS + '/' + fileName);
+                    System.out.println("File saved in " + DOWNLOADS + '/' + fileName);
                     fos.close();
+                    return true;
                 }
 	}
         
@@ -138,36 +136,65 @@ public class Server extends Thread {
                 System.err.println("No request received from client.");
                 return;
             }
+            String certOwner;
+            boolean successful;
             String request = new String(buffer).split("\0")[0];
             String[] requestArgs = request.split(" ");
             System.out.println("Request is " + request);
             switch (requestArgs[0]) {
                 case "add":
-                        saveFile(sock);
-                        if(requestArgs[1] == "cert") {
-                            String certOwner = processCert(requestArgs[2]);
+                        successful = saveFile(sock);
+                        if(successful && requestArgs[1].equals("cert")) {
+                            certOwner = processCert(requestArgs[2]);
                             if(certOwner == null) {
-                                System.err.println("Error adding certificate to the server.");
+                                sendResult(sock, "ERROR: Unable to get cert owner");
                                 return;
                             }
-                            System.out.println("The certificate '" + certOwner + "' has been added to the server.");
+                            sendResult(sock, "The certificate '" + certOwner + "' has been added to the server");
+                        } else if(successful && requestArgs[1].equals("file")) {
+                            sendResult(sock, requestArgs[2] + " has been added to the server");
+                        } else {
+                            sendResult(sock, "ERROR: Unable to save file");
                         }
                         break;
-                case "fetch":
-                        sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
+                case "fetch":                        
+                        successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
+                        if(successful) {
+                            sendResult(sock, requestArgs[1] + " has been sent to the client");
+                        } else {
+                            sendResult(sock, "ERROR: Unable to send the file to the client");
+                        }
                         break;
                 case "list":  
-                        sendList(sock);
+                        successful = sendList(sock);
+                        if(successful) {
+                            sendResult(sock, "File list has been sent to the client");
+                        } else {
+                            sendResult(sock, "ERROR: Unable to send file list");
+                        }
                         break;
                 case "vouch":
-                        saveFile(sock);
-                        String certOwner = processCert(requestArgs[2]);
-                        if(certOwner == null) {
-                            System.err.println("Error adding certificate to the server.");
+                        if (!new File(DOWNLOADS + '/' + requestArgs[1]).exists()) {
+                            sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                             return;
                         }
-                        vouchFile(requestArgs[1], certOwner);
-                        
+                        successful = saveFile(sock);
+                        if(successful) {
+                            certOwner = processCert(requestArgs[2]);
+                            if(certOwner == null) {
+                                System.err.println("");
+                                sendResult(sock, "ERROR: Unable to get cert owner");
+                                return;
+                            }
+                            System.out.println("The certificate '" + certOwner + "' has been added to the server");
+                            successful = vouchFile(requestArgs[1], certOwner);
+                            if(successful) {
+                                sendResult(sock, certOwner + " succesfuly vouched for file: " + requestArgs[1]);
+                            } else {
+                                sendResult(sock, "ERROR: Unable to vouch for " + requestArgs[1]);
+                            }
+                        }
+                        sendResult(sock, "ERROR: Unable to save certificate.");
                         break;
                 default: System.err.println("Error request not valid.");
                          break;
@@ -180,16 +207,35 @@ public class Server extends Thread {
             Path newdir = Paths.get(CERTSTORE);
             owner = getOwner(getCert(source.toString())); //gets the cert owner
             String newName = owner + ".cer";
-            Files.move(source, newdir.resolve(newName), REPLACE_EXISTING);
-            return owner;
+            try {
+                Files.move(source, newdir.resolve(newName), REPLACE_EXISTING);
+            } catch(Exception e) {
+                System.err.println("Moving certificate failed.");
+            }
+                return owner;
         }
         
-        void vouchFile(String fileName, String certOwner) {
+        boolean vouchFile(String fileName, String certOwner) {
             //add certOwner to file hastable
+            return true;
         }
         
-        void sendList(SSLSocket clientSock) {
-            
+        boolean sendList(SSLSocket clientSock) {
+            return true;
+        }
+        
+        void sendResult(SSLSocket clientSock, String msg) throws IOException {
+            try {
+                DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
+                String message = msg + new String(new char[BUFFSIZE]);
+                System.out.println(msg);
+                dos.write(message.getBytes(), 0, BUFFSIZE);         
+                dos.flush();  
+                dos.close(); 
+            } catch(Exception e) {
+                return;    
+            }
+         
         }
         
         private byte[] intToByteArray(int value) {
@@ -200,38 +246,38 @@ public class Server extends Thread {
                 (byte)value};
         }
         
-        private void sendFile(SSLSocket clientSock, String path) throws IOException {
-                File myFile = new File(path);  
-                byte[] mybytearray = new byte[(int) myFile.length()];  
-
+        private boolean sendFile(SSLSocket clientSock, String path) throws IOException {
+            File myFile = new File(path);  
+            byte[] mybytearray = new byte[(int) myFile.length()];
+            DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
+            try {
                 FileInputStream fis = new FileInputStream(myFile);  
                 BufferedInputStream bis = new BufferedInputStream(fis);  
-
-
                 DataInputStream dis = new DataInputStream(bis);     
                 dis.readFully(mybytearray, 0, mybytearray.length);  
-
-
-                
+            } catch (Exception e) {
+                System.err.println("Unable to open or read file.");
+                dos.write(intToByteArray(0), 0, 4); //send a filesize of 0 so the client knows things are wrong
+                return false;                
+            }   
                 try {
-                    DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
                     
                     //Sending file name and file size to the server  
                     int fileSize = mybytearray.length;
-                    dos.write(intToByteArray(fileSize), 0, 4);
+                    dos.write(intToByteArray(fileSize), 0, 4);                    
                     String fileName = myFile.getName() + new String(new char[BUFFSIZE]);
-                    System.out.println(fileName + " is "+ fileSize + " long");
                     dos.write(fileName.getBytes(), 0, BUFFSIZE);     
 
                     //Sending file
                     dos.write(mybytearray, 0, mybytearray.length);     
                     dos.flush();  
-                    dos.close(); 
+                    //dos.close(); 
                     System.out.println("File sent!\n");
+                    return true;
                         
                 } catch(SocketException e) {
                     System.err.println("Lost connection to client during transfer.");
-                    return;
+                    return false;
                 }
                           
         }
@@ -247,6 +293,8 @@ public class Server extends Thread {
                                 cert = (X509Certificate)cf.generateCertificate(bis); 
                                 
                         }
+                        fis.close();
+                        bis.close();
 		} catch (Exception e) {
 			System.err.println("Could not get certificate.");
 		}
