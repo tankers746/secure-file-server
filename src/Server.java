@@ -1,3 +1,4 @@
+import java.util.*;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -20,35 +21,43 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
+import java.security.cert.*;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 
 
 public class Server extends Thread {
 	
         public static final int BUFFSIZE = 1024;
+<<<<<<< HEAD
         public final static String DOWNLOADS = "C:/Users/Tom/Documents";
         public final static String CERTSTORE = "Certificates";        
         
+=======
+        public final static String DOWNLOADS = "C:/Users/Jason/Desktop/Server";        
+>>>>>>> origin/master
 	private ServerSocket ss;
+        public static KeyStore ks;
 	
 	public Server(int port) {
 		try {
                     SSLContext context;
                     KeyManagerFactory kmf;
-                    KeyStore ks;
                     
                     char[] storepass = "password".toCharArray();
                     char[] keypass = "password".toCharArray();
-                    String storepath = "C:/Users/Tom/OneDrive/Documents/NetBeansProjects/secure-file-server/src/server.pks";
-
+                    String storepath = "server.jks";
+                    
+                    /*Initialize and load the java keystore*/
                     context = SSLContext.getInstance("TLS");
                     kmf = KeyManagerFactory.getInstance("SunX509");
                     ks = KeyStore.getInstance("JKS");
                     ks.load(new FileInputStream(storepath), storepass);
-
                     kmf.init(ks, keypass);
                     context.init(kmf.getKeyManagers(), null, null);
+                    
+                    /*Create an SSL socket*/
                     SSLServerSocketFactory ssf = context.getServerSocketFactory();
-
                     ss = ssf.createServerSocket(port);
                     
 		} catch (Exception e) {
@@ -227,8 +236,54 @@ public class Server extends Thread {
                           
         }
 	
-	public static void main(String[] args) {
-		Server fs = new Server(1342);
+        /*Get a certificate object from a .cer file*/       
+        public static X509Certificate getCert(String certpath) {
+                X509Certificate cert = null;
+                try {
+                        FileInputStream fis = new FileInputStream(certpath);
+                        BufferedInputStream bis = new BufferedInputStream(fis);
+                        CertificateFactory cf = CertificateFactory.getInstance("X.509");                        
+                        while (bis.available() > 0) {
+                                cert = (X509Certificate)cf.generateCertificate(bis); 
+                                
+                        }
+		} catch (Exception e) {
+			System.err.println("Could not get certificate.");
+		}
+                return cert;
+        }
+        
+        /*Get the name of the certificate owner*/
+        public static String getOwner(X509Certificate cert) {
+                String owner = null;
+                try {
+                        String dn = cert.getSubjectX500Principal().getName();                
+                        LdapName ldapDN = new LdapName(dn);
+                        List<Rdn> rdn = ldapDN.getRdns();
+                        owner = (String)rdn.get(5).getValue();
+                } catch (Exception e) {
+                        System.err.println("Could not get owner name.");
+                }
+                return owner;
+        }
+
+        /*Get the name of the certificate signer*/
+        public static String getSigner(X509Certificate cert) {
+                String owner = null;
+                try {
+                        String dn = cert.getIssuerX500Principal().getName();                
+                        LdapName ldapDN = new LdapName(dn);
+                        List<Rdn> rdn = ldapDN.getRdns();
+                        owner = (String)rdn.get(5).getValue();
+                } catch (Exception e) {
+                        System.err.println("Could not get owner name.");
+                }
+                return owner;
+        }
+
+        
+	public static void main(String[] args) {               
+		Server fs = new Server(1343);
 		fs.start();
 	}
 
