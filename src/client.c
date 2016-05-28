@@ -506,11 +506,12 @@ int main(int argc, char *argv[])
             case VOUCH_MODE :
 		msg = getServerMessage(ssl);
 		char *temp = strtok(msg, ":");
-   		if(strcmp(temp, "ERROR") == 0) {
-			getMsg = 0;
+ 		getMsg = 0;  		
+		if(strcmp(temp, "ERROR") == 0) {
 			break;
 		}
 		result = sendFile(ssl, fileName); //send the vouching cert to the server
+		msg = getServerMessage(ssl);
 		break;
             case DEFAULT_MODE: fprintf(stderr, "[Client] Please specify a send or receive argument, type -? for usage.\n");
     		exit(EXIT_FAILURE);
