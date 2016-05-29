@@ -502,6 +502,9 @@ int main(int argc, char *argv[])
 		break;
             case FETCH_MODE : 
 		sendCircumference(ssl, circumference);
+		memset(request, '\0', LENGTH); //empty the request buffer, ready to send trustedname
+		snprintf(request, sizeof(request), "%s",trustedname);	
+		sendRequest(ssl, request); //send the trustedname as a request (only doing this because I cant be bothered writing a new method and this one works fine.
 		if(getServerMessage(ssl) == EXIT_FAILURE) {
 			exit(EXIT_FAILURE);
 		}		
