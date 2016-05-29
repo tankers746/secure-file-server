@@ -458,7 +458,7 @@ int main(int argc, char *argv[])
 		mode = SEND_MODE;
                 break;
             case 'v' : //vouch
-		if(argv[optind][0] == '-' || argv[optind] == NULL) { //check whether certificate arg is given
+		if(argv[optind] == NULL || argv[optind][0] == '-') { //check whether certificate arg is given
 			fprintf(stderr,"Please specify a certicate. Type -? for usage.\n");
 			exit(EXIT_FAILURE);
 		}
