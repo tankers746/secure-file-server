@@ -5,9 +5,13 @@ import java.util.Hashtable;
 public class FileTable {
 
 	Hashtable<String, ArrayList<String>> table = new Hashtable<>();
+	ArrayList<String> fileList = new ArrayList<>();
 	
 	public void addFile(String filename){
 		table.put(filename,  new ArrayList<String>());
+		if (!(fileList.contains(fileList))){
+			fileList.add(filename);
+		}
 	}
 	
 	public void addCertificate(String filename, String certificate){
@@ -28,6 +32,10 @@ public class FileTable {
 		else{
 			return null; //return null if filename doesn't exist in the table
 		}
+	}
+	
+	public ArrayList<String> getFileList(){
+		return this.fileList;
 	}
 	
 }

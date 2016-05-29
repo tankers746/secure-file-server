@@ -321,7 +321,23 @@ public class Server extends Thread {
     }
     
     boolean sendList(SSLSocket clientSock) {
-        return true;
+    	String list = "filename: certOwners\n";
+    	ArrayList<String> fileList = this.fileTable.getFileList();
+    	for (String filename: fileList){
+    		list += filename + ": ";
+    		ArrayList<String> certs = this.fileTable.getList(filename);
+    		for (String cert: certs){
+    			list += cert + " | ";
+    		}
+    		list += "\n";
+    	}
+    	try {
+    		sendResult(clientSock, list);
+    		return true;
+    	} catch (Exception e){
+    		e.printStackTrace();
+    		return false;
+    	}
     }
         
     void sendResult(SSLSocket clientSock, String msg) throws IOException {
