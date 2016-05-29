@@ -78,6 +78,7 @@ public class Server extends Thread {
 			}
 		}
 	}
+	
 
 	private boolean saveFile(SSLSocket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
@@ -200,6 +201,7 @@ public class Server extends Thread {
 			list.add(t);
 			while (true){
 //				n = t.getSignee();
+				n = getSignee(t);
 				if (n == null) break;
 				if (list.contains(n)){
 					if (n.equals(cert)){
@@ -213,6 +215,12 @@ public class Server extends Thread {
 			masterList.add(list);
 		}
 		return masterList;
+	}
+	
+	private String getSignee(String cert){
+		String path = CERTSTORE + cert + ".cer";
+		String signee = getSigner(getCert(path));
+		return signee;
 	}
 	
     private void serveClient(SSLSocket sock) throws IOException {
@@ -303,7 +311,7 @@ public class Server extends Thread {
         } catch(Exception e) {
             System.err.println("Moving certificate failed.");
         }
-            return owner;
+        return owner;
     }
     
     boolean vouchFile(String fileName, String certOwner) {
