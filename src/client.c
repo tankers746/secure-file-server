@@ -45,7 +45,7 @@ int sendRequest(SSL *ssl, char *request) {
 
 }
 
-char * getServerMessage(SSL *ssl) {
+int getServerMessage(SSL *ssl) {
     char buffer[LENGTH];
     char  *msg = malloc(LENGTH *sizeof(char));
     memset(buffer, '\0', sizeof(int));
@@ -61,15 +61,16 @@ char * getServerMessage(SSL *ssl) {
 
     char *temp = strtok(buffer, ":");
     if(strcmp(temp, "ERROR") == 0) {
-	fprintf(stderr,"\x1b[31m[Server] %s\n\x1b[0m",msg);	    
+	fprintf(stderr,"\x1b[31m[Server] %s\n\x1b[0m",msg);
+	return EXIT_FAILURE;
     } else {
     	fprintf(stderr,"\x1b[32m[Server] %s\n\x1b[0m",msg);
+	return EXIT_SUCCESS;
     }
-    return msg;
 }
 
 int sendMetaData(char *path, SSL *ssl, char **name) {
-    int size;
+    int size = 0;
     char buffer[LENGTH];
     memset(buffer, '\0', LENGTH);
     
@@ -81,7 +82,6 @@ int sendMetaData(char *path, SSL *ssl, char **name) {
     
     if(SSL_write(ssl, &netsize, sizeof(netsize)) <= 0) {
         fprintf(stderr, "[Client] ERROR: Failed to send file size. (errno = %d)\n", errno);
-        //return '\0';
     }
     
     
@@ -91,6 +91,15 @@ int sendMetaData(char *path, SSL *ssl, char **name) {
         //return '\0';
     }
     return size;
+}
+
+int sendCircumference(SSL *ssl, int circumference) {
+    int netcircumference = htonl(circumference);    
+    if(SSL_write(ssl, &netcircumference, sizeof(netcircumference)) <= 0) {
+        fprintf(stderr, "[Client] ERROR: Failed to send file size. (errno = %d)\n", errno);
+	return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
 
 
@@ -180,7 +189,7 @@ int sendFile(SSL *ssl, char *filePath) {
     return EXIT_SUCCESS;
 }
 
-int receiveFile(SSL *ssl, char * downloadsFolder) {
+int receiveFile(SSL *ssl) {
 	
     int fileSize = recvFileSize(ssl); 	
     if(fileSize == 0) {
@@ -192,8 +201,6 @@ int receiveFile(SSL *ssl, char * downloadsFolder) {
     char buffer[LENGTH];
     
     fprintf(stderr,"Receiving %s which is %i bytes\n",fileName,fileSize);
-    char filePath[PATH_MAX];
-    snprintf(filePath, sizeof(filePath), "%s/%s", downloadsFolder, fileName);
     free(fileName);
     
     memset(buffer, '\0', LENGTH);
@@ -408,8 +415,6 @@ int main(int argc, char *argv[])
     int sockfd;
     SSL_CTX *ctx;
 
-    char *downloads = "/Users/Jason/Desktop/secure-file-server/downloads";
-
     char request[LENGTH];
     memset(request, '\0', LENGTH);
 
@@ -442,9 +447,10 @@ int main(int argc, char *argv[])
             case 'l' : //list all files on server
 		snprintf(request, sizeof(request), "list");
 		mode = LIST_MODE;
-		//todo create list all files method
+		break;
             case 'n' : //require name in circle
                 trustedname = optarg;
+		break;
             case 'u' : //upload a cert
                 fileName = optarg;
 		certname = basename(fileName);
@@ -461,9 +467,6 @@ int main(int argc, char *argv[])
 		snprintf(request, sizeof(request), "vouch %s %s",optarg, certname);
 		mode = VOUCH_MODE;
 		optind = optind+1;
-            break;
-
-
 		break;
 	    case '?' : //print usage
 		print_usage();
@@ -498,20 +501,21 @@ int main(int argc, char *argv[])
 		}
 		break;
             case FETCH_MODE : 
-		 result = receiveFile(ssl, downloads);
+		sendCircumference(ssl, circumference);
+		if(getServerMessage(ssl) == EXIT_FAILURE) {
+			exit(EXIT_FAILURE);
+		}		
+		result = receiveFile(ssl);
                 break;
             case LIST_MODE : 
-		//todo list function
-                break;
+		result = receiveFile(ssl);
+		break;
             case VOUCH_MODE :
-		msg = getServerMessage(ssl);
-		char *temp = strtok(msg, ":");
  		getMsg = 0;  		
-		if(strcmp(temp, "ERROR") == 0) {
+		if(getServerMessage(ssl) == EXIT_FAILURE) {
 			break;
 		}
 		result = sendFile(ssl, fileName); //send the vouching cert to the server
-		msg = getServerMessage(ssl);
 		break;
             case DEFAULT_MODE: fprintf(stderr, "[Client] Please specify a send or receive argument, type -? for usage.\n");
     		exit(EXIT_FAILURE);
