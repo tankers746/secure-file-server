@@ -171,7 +171,8 @@ public class Server extends Thread {
 		ArrayList<ArrayList<String>> newList = new ArrayList<>();
 		
 		for (ArrayList<String> mlist: masterList){
-			if (mlist.size() == circumference || mlist.size() == (circumference+1)){
+//			if (mlist.size() >= circumference){
+			if (mlist.size() > circumference){
 				newList.add(mlist);
 			}
 		}
