@@ -36,10 +36,7 @@ public class Server extends Thread {
     public final static String STOREPATH = "server.jks"; 
         
     private ServerSocket ss;
-    public static KeyStore ks;
-    
-    private int circumference = 0;
-    private String person = null;
+    private static KeyStore ks;
     private FileTable fileTable;
 	
 	public Server(int port) {
@@ -135,29 +132,29 @@ public class Server extends Thread {
             }
         }
 
-	private boolean checkCircle(String filename){
-		if (this.circumference == 0) return true; //return true if circumference is 0
+	private boolean checkCircle(String filename, int circumference, String person){
+		if (circumference == 0) return true; //return true if circumference is 0
 		ArrayList<String> fileCerts = this.fileTable.getList(filename);
-		if (this.person != null){
+		if (person != null){
 			boolean pavailable = false;
 			for (String cert: fileCerts){
-				if (cert.equals(this.person)){
+				if (cert.equals(person)){
 					pavailable = true;
 				}
 			}
 			if (pavailable == false) return false;
 		}
-		ArrayList<String> circle = findCircle(fileCerts);
+		ArrayList<String> circle = findCircle(fileCerts, circumference, person);
 		if (circle != null) return true;
 		return false;
 	}
 	
-	private ArrayList<String> findCircle(ArrayList<String> fileCerts){
+	private ArrayList<String> findCircle(ArrayList<String> fileCerts, int circumference, String person) {
 		ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
 		ArrayList<ArrayList<String>> newList = new ArrayList<>();
 		
 		for (ArrayList<String> mlist: masterList){
-			if (mlist.size() == this.circumference || mlist.size() == (this.circumference+1)){
+			if (mlist.size() == circumference || mlist.size() == (circumference+1)){
 				newList.add(mlist);
 			}
 		}
@@ -166,8 +163,8 @@ public class Server extends Thread {
 			String first = nlist.get(0);
 			String last = nlist.get(nlist.size()-1);
 			if (first.equals(last)){ //Check if proper closed loop is formed
-				if (this.person != null){ //Check if a person is required in the loop
-					if (nlist.contains(this.person)){ //Check if this list contains that person
+				if (person != null){ //Check if a person is required in the loop
+					if (nlist.contains(person)){ //Check if this list contains that person
 						boolean all = true; //Check if the list contains all the people vouching for the file
 						for (String c: nlist){
 							if (!(fileCerts.contains(c))){
@@ -236,6 +233,8 @@ public class Server extends Thread {
             return;
         }
         String certOwner;
+        String person = null;
+        int circumference = 0;
         boolean successful;
         String request = new String(buffer).split("\0")[0];
         String[] requestArgs = request.split(" ");
@@ -259,16 +258,26 @@ public class Server extends Thread {
                 break;
             case "fetch": 
                 circumference = dis.readInt();
+                dis.read(buffer, 0, BUFFSIZE); //read the trustedname
+                String trustedname = new String(buffer).split("\0")[0];
+                if(!trustedname.equals("(null)")) person = trustedname; //checks whether a trustedname was actually sent          
+                
                 if (!this.fileTable.fileList.contains(requestArgs[1])) {
                     sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                     break;
                 }
-            	successful = checkCircle(requestArgs[1]);
+            	successful = checkCircle(requestArgs[1], circumference, person);
             	if (successful) {
-                        sendResult(sock, "Circle of circumference " + circumference + " exists for file " + requestArgs[1]);
-            		successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
+                    if(person != null) {
+                        sendResult(sock, "Circle of circumference " + circumference + " containing " + person + " exists for file " + requestArgs[1]);
+                    } else sendResult(sock, "Circle of circumference " + circumference + " exists for file " + requestArgs[1]);
+                    successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
                 } else {
+                    if(person != null) {
+                        sendResult(sock, "ERROR: circle of circumference " + circumference + " containing " + person + " does not exist for file " + requestArgs[1]);
+                    } else {
                         sendResult(sock, "ERROR: circle of circumference " + circumference + " does not exist for file " + requestArgs[1]);
+                    }
                 } if(successful) {
                     sendResult(sock, requestArgs[1] + " has been sent to the client");
                 } else {
