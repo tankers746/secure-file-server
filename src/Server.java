@@ -5,9 +5,11 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -33,7 +35,7 @@ public class Server extends Thread {
     public final static String CERTSTORE = "Certificates";        
     public final static String STOREPATH = "server.jks"; 
         
-	private ServerSocket ss;
+    private ServerSocket ss;
     public static KeyStore ks;
     
     private int circumference = 0;
@@ -41,6 +43,7 @@ public class Server extends Thread {
     private FileTable fileTable;
 	
 	public Server(int port) {
+            fileTable = new FileTable();
 		try {
             SSLContext context;
             KeyManagerFactory kmf;
@@ -84,53 +87,53 @@ public class Server extends Thread {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
 		byte[] buffer = new byte[BUFFSIZE];
 
-        int filesize =  0;
-                
-        try {
-            filesize = dis.readInt();
-        } catch (EOFException e) {
-            System.err.println("No filesize received from client");
-            return false;
-        }
-               
-        System.out.println("Filesize is " + filesize);
-        dis.read(buffer, 0, BUFFSIZE);
-        String fileName = new String(buffer).split("\0")[0];
-        System.out.println("Filename is " + fileName);
-                
-        int read = 0;
-		int totalRead = 0;
-		int remaining = filesize;
-                
-        File receivedFile = new File(DOWNLOADS + '/' + fileName);
-		FileOutputStream fos = new FileOutputStream(receivedFile);                
-        //String progress = "[                    ]";
-        int n = 0;
-		while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
-			totalRead += read;
-			remaining -= read;
-			//System.out.println("read " + totalRead + " bytes.");
-			fos.write(buffer, 0, read);
-                        
-            //System.out.println(round(((float)totalRead/(float)filesize)*100));
-            if(round(((float)totalRead/(float)filesize)*100) == n) {
-                n = n+5;
-                System.out.print('|');
+            int filesize =  0;
+
+            try {
+                filesize = dis.readInt();
+            } catch (EOFException e) {
+                System.err.println("No filesize received from client");
+                return false;
             }
-                        
-		}
-        if(totalRead < filesize) {
-            System.err.println("File transfer was unsuccessful.");
-            fos.close();
-            Path p = Paths.get(DOWNLOADS + '/' + fileName);
-            Files.delete(p); 
-            return false;
-        } else {
-            System.out.println("File saved in " + DOWNLOADS + '/' + fileName);
-            fos.close();
-            return true;
+
+            System.out.println("Filesize is " + filesize);
+            dis.read(buffer, 0, BUFFSIZE);
+            String fileName = new String(buffer).split("\0")[0];
+            System.out.println("Filename is " + fileName);
+
+            int read = 0;
+                    int totalRead = 0;
+                    int remaining = filesize;
+
+            File receivedFile = new File(DOWNLOADS + '/' + fileName);
+                    FileOutputStream fos = new FileOutputStream(receivedFile);                
+            //String progress = "[                    ]";
+            int n = 0;
+                    while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
+                            totalRead += read;
+                            remaining -= read;
+                            //System.out.println("read " + totalRead + " bytes.");
+                            fos.write(buffer, 0, read);
+
+                //System.out.println(round(((float)totalRead/(float)filesize)*100));
+                if(round(((float)totalRead/(float)filesize)*100) == n) {
+                    n = n+5;
+                    System.out.print('|');
+                }
+
+                    }
+            if(totalRead < filesize) {
+                System.err.println("File transfer was unsuccessful.");
+                fos.close();
+                Path p = Paths.get(DOWNLOADS + '/' + fileName);
+                Files.delete(p); 
+                return false;
+            } else {
+                System.out.println("File saved in " + DOWNLOADS + '/' + fileName);
+                fos.close();
+                return true;
+            }
         }
-	}
 
 	private boolean checkCircle(String filename){
 		if (this.circumference == 0) return true; //return true if circumference is 0
@@ -248,37 +251,48 @@ public class Server extends Thread {
                     }
                     sendResult(sock, "The certificate '" + certOwner + "' has been added to the server");
                 } else if(successful && requestArgs[1].equals("file")) {
+                    this.fileTable.addFile(requestArgs[2]); //add the file to the filetable
                     sendResult(sock, requestArgs[2] + " has been added to the server");
                 } else {
                     sendResult(sock, "ERROR: Unable to save file");
                 }
                 break;
             case "fetch": 
-            	boolean circle = checkCircle(requestArgs[1]);
-            	if (circle)
+                circumference = dis.readInt();
+                if (!this.fileTable.fileList.contains(requestArgs[1])) {
+                    sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
+                    break;
+                }
+            	successful = checkCircle(requestArgs[1]);
+            	if (successful) {
+                        sendResult(sock, "Circle of circumference " + circumference + " exists for file " + requestArgs[1]);
             		successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
-            	else
-            		successful = false;
-                if(successful) {
+                } else {
+                        sendResult(sock, "ERROR: circle of circumference " + circumference + " does not exist for file " + requestArgs[1]);
+                } if(successful) {
                     sendResult(sock, requestArgs[1] + " has been sent to the client");
                 } else {
                     sendResult(sock, "ERROR: Unable to send the file to the client");
                 }
                 break;
             case "list":  
-                successful = sendList(sock);
+                successful = getList();
                 if(successful) {
-                    sendResult(sock, "File list has been sent to the client");
-                } else {
-                    sendResult(sock, "ERROR: Unable to send file list");
-                }
+                    successful = sendFile(sock, "filelist");
+                    Files.delete(Paths.get("filelist"));
+                    if(successful) {
+                        sendResult(sock, "File list has been sent to the client");
+                        break;
+                    }                    
+                } 
+                sendResult(sock, "ERROR: Unable to send file list");                
                 break;
             case "vouch":
-                if (!new File(DOWNLOADS + '/' + requestArgs[1]).exists()) {
+                if (!this.fileTable.fileList.contains(requestArgs[1])) {
                     sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                     return;
                 }
-                sendResult(sock, "File is on the server");
+                sendResult(sock, "File exists on the server");
                 successful = saveFile(sock);
                 if(successful) {
                     certOwner = processCert(requestArgs[2]);
@@ -320,24 +334,26 @@ public class Server extends Thread {
         return true;
     }
     
-    boolean sendList(SSLSocket clientSock) {
-    	String list = "filename: certOwners\n";
+    Boolean getList() {
+    	String list = "";
     	ArrayList<String> fileList = this.fileTable.getFileList();
     	for (String filename: fileList){
-    		list += filename + ": ";
+                list += String.format("\n --------------------------------\n| Filename: %20s |"
+                        + "\n --------------------------------\n| Vouched for by:%15s |", filename,"");
     		ArrayList<String> certs = this.fileTable.getList(filename);
     		for (String cert: certs){
-    			list += cert + " | ";
+    			list += String.format("\n| %30s |", cert);
     		}
-    		list += "\n";
+                list += "\n --------------------------------\n";
     	}
-    	try {
-    		sendResult(clientSock, list);
-    		return true;
-    	} catch (Exception e){
-    		e.printStackTrace();
-    		return false;
-    	}
+        
+        
+        try(PrintWriter out = new PrintWriter("filelist")  ){
+            out.println(list);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
         
     void sendResult(SSLSocket clientSock, String msg) throws IOException {
@@ -370,6 +386,7 @@ public class Server extends Thread {
             BufferedInputStream bis = new BufferedInputStream(fis);  
             DataInputStream dis = new DataInputStream(bis);     
             dis.readFully(mybytearray, 0, mybytearray.length);  
+            fis.close();
         } catch (Exception e) {
             System.err.println("Unable to open or read file.");
             dos.write(intToByteArray(0), 0, 4); //send a filesize of 0 so the client knows things are wrong
@@ -447,6 +464,7 @@ public class Server extends Thread {
         
 	public static void main(String[] args) {               
 		Server fs = new Server(1343);
+                
 		fs.start();
 	}
 

@@ -4,12 +4,17 @@ import java.util.Hashtable;
 
 public class FileTable {
 
-	Hashtable<String, ArrayList<String>> table = new Hashtable<>();
-	ArrayList<String> fileList = new ArrayList<>();
+	Hashtable<String, ArrayList<String>> table;
+	ArrayList<String> fileList;
 	
-	public void addFile(String filename){
+	public FileTable() {
+            table = new Hashtable<>();
+            fileList = new ArrayList<>();
+        }
+        
+        public void addFile(String filename){
 		table.put(filename,  new ArrayList<String>());
-		if (!(fileList.contains(fileList))){
+		if (!(fileList.contains(filename))){
 			fileList.add(filename);
 		}
 	}
