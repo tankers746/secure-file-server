@@ -1,4 +1,6 @@
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -20,9 +22,62 @@ public class FileTable implements Serializable{
 		if (!(fileList.contains(filename))){
 			fileList.add(filename);
 		}
-		saveFileTable();
+                saveHashTable();
+                saveArrayList();                
 	}
 	
+    public void saveHashTable(){
+    	try{
+    		FileOutputStream fos = new FileOutputStream("Hashtable.ser");
+    		ObjectOutputStream oos = new ObjectOutputStream(fos);
+    		oos.writeObject(this.table);
+    		oos.close();
+    		fos.close();
+    	} catch(Exception e){
+    		System.err.println("Error saving hash table");
+    	}
+    }
+    
+    public void saveArrayList(){
+    	try{
+    		FileOutputStream fos = new FileOutputStream("FileList.ser");
+    		ObjectOutputStream oos = new ObjectOutputStream(fos);
+    		oos.writeObject(this.fileList);
+    		oos.close();
+    		fos.close();
+    	} catch(Exception e){
+    		System.err.println("Error saving file list");
+    	}
+    }
+    
+    public Object getHashTable(){
+    	Object obj = null;
+    	try{
+    		FileInputStream fis = new FileInputStream("Hashtable.ser");
+    		ObjectInputStream ois = new ObjectInputStream(fis);
+    		obj = ois.readObject();
+    		ois.close();
+    		fis.close();
+    	} catch(Exception e){
+    		System.err.println("Error reading hash table");
+    	}
+    	return obj;
+    }
+    
+    public Object getArrayList(){
+    	Object obj = null;
+    	try{
+    		FileInputStream fis = new FileInputStream("FileList.ser");
+    		ObjectInputStream ois = new ObjectInputStream(fis);
+    		obj = ois.readObject();
+    		ois.close();
+    		fis.close();
+    	} catch(Exception e){
+    		System.err.println("Error reading file list");
+    	}
+    	return obj;
+    }
+    
 	public void addCertificate(String filename, String certificate){
 		if (table.containsKey(filename) == false){
 			System.err.println("Filename not found. Can't add certificate!");
@@ -32,6 +87,8 @@ public class FileTable implements Serializable{
                         if(!currList.contains(certificate)) {
 			currList.add(certificate);
 			table.put(filename, currList);
+                        saveHashTable();
+                        saveArrayList();
                         }
 		}
 	}
@@ -47,17 +104,6 @@ public class FileTable implements Serializable{
 	
 	public ArrayList<String> getFileList(){
 		return this.fileList;
-	}
-	
-	public void saveFileTable(){
-		try{
-			FileOutputStream fs = new FileOutputStream("FileTable.ser");
-			ObjectOutputStream os = new ObjectOutputStream(fs);
-			os.writeObject(this);
-			os.close();
-		} catch (Exception e){
-			e.printStackTrace();
-		}
 	}
 	
 }

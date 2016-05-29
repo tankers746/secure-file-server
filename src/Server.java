@@ -41,12 +41,20 @@ public class Server extends Thread {
     private FileTable fileTable;
 	
 	public Server(int port) {
-            this.fileTable = (FileTable) readFileTable();
-		if (this.fileTable == null){
-			System.err.println("Error reading FileTable, creating new FileTable.ser");
-			this.fileTable = new FileTable();
-			this.fileTable.saveFileTable();
-		}
+
+            this.fileTable = new FileTable();
+            this.fileTable.fileList = (ArrayList<String>) this.fileTable.getArrayList();
+            this.fileTable.table = (Hashtable<String, ArrayList<String>>) this.fileTable.getHashTable();
+            if (this.fileTable.fileList == null){
+                    this.fileTable.fileList = new ArrayList<>();
+                    this.fileTable.saveArrayList();
+            }
+            if (this.fileTable.table == null){
+                    this.fileTable.table = new Hashtable<>();
+                    this.fileTable.saveHashTable();
+            }
+                       
+
             try {
             SSLContext context;
             KeyManagerFactory kmf;
@@ -156,7 +164,7 @@ public class Server extends Thread {
 		if (person != null){
 			boolean pavailable = false;
 			for (String cert: fileCerts){
-				if (cert.equals(person)){
+				if (cert.equalsIgnoreCase(person)){
 					pavailable = true;
 				}
 			}
