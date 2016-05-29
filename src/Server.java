@@ -245,8 +245,12 @@ public class Server extends Thread {
                     sendResult(sock, "ERROR: Unable to save file");
                 }
                 break;
-            case "fetch":                        
-                successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
+            case "fetch": 
+            	boolean circle = checkCircle(requestArgs[1]);
+            	if (circle)
+            		successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
+            	else
+            		successful = false;
                 if(successful) {
                     sendResult(sock, requestArgs[1] + " has been sent to the client");
                 } else {
@@ -304,6 +308,7 @@ public class Server extends Thread {
     
     boolean vouchFile(String fileName, String certOwner) {
         //add certOwner to file hastable
+    	this.fileTable.addCertificate(fileName, certOwner);
         return true;
     }
     
