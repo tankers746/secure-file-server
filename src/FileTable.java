@@ -23,10 +23,12 @@ public class FileTable {
 		if (table.containsKey(filename) == false){
 			System.err.println("Filename not found. Can't add certificate!");
 		}
-		else{
+                else {
 			ArrayList<String> currList = (ArrayList<String>) table.get(filename);
+                        if(!currList.contains(certificate)) {
 			currList.add(certificate);
 			table.put(filename, currList);
+                        }
 		}
 	}
 	
