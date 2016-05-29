@@ -286,7 +286,7 @@ public class Server extends Thread {
                 }
             	successful = checkCircle(requestArgs[1], circumference, person);
             	if (successful) {
-                    if(person != null) {
+                    if(person != null && circumference != 0) {
                         sendResult(sock, "Circle of circumference " + circumference + " containing " + person + " exists for file " + requestArgs[1]);
                     } else sendResult(sock, "Circle of circumference " + circumference + " exists for file " + requestArgs[1]);
                     successful = sendFile(sock, DOWNLOADS + '/' + requestArgs[1]);
