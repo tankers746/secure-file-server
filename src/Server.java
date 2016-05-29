@@ -221,7 +221,7 @@ public class Server extends Thread {
 			ArrayList<String> list = new ArrayList<>();
 			list.add(t);
 			while (true){
-				n = getSigner(getCert(CERTSTORE + '/' + cert + ".cer"));
+				n = getSigner(getCert(CERTSTORE + '/' + t + ".cer"));
 				if (n == null) break;
 				if (list.contains(n)){
 					if (n.equals(cert)){
