@@ -35,6 +35,10 @@ public class Server extends Thread {
         
 	private ServerSocket ss;
     public static KeyStore ks;
+    
+    private int circumference = 0;
+    private String person = null;
+    private FileTable fileTable;
 	
 	public Server(int port) {
 		try {
@@ -126,7 +130,91 @@ public class Server extends Thread {
             return true;
         }
 	}
-        
+
+	private boolean checkCircle(String filename){
+		if (this.circumference == 0) return true; //return true if circumference is 0
+		ArrayList<String> fileCerts = this.fileTable.getList(filename);
+		if (this.person != null){
+			boolean pavailable = false;
+			for (String cert: fileCerts){
+				if (cert.equals(this.person)){
+					pavailable = true;
+				}
+			}
+			if (pavailable == false) return false;
+		}
+		ArrayList<String> circle = findCircle(fileCerts);
+		if (circle != null) return true;
+		return false;
+	}
+	
+	private ArrayList<String> findCircle(ArrayList<String> fileCerts){
+		ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
+		ArrayList<ArrayList<String>> newList = new ArrayList<>();
+		
+		for (ArrayList<String> mlist: masterList){
+			if (mlist.size() == this.circumference || mlist.size() == (this.circumference+1)){
+				newList.add(mlist);
+			}
+		}
+		
+		for (ArrayList<String> nlist: newList){
+			String first = nlist.get(0);
+			String last = nlist.get(nlist.size()-1);
+			if (first.equals(last)){ //Check if proper closed loop is formed
+				if (this.person != null){ //Check if a person is required in the loop
+					if (nlist.contains(this.person)){ //Check if this list contains that person
+						boolean all = true; //Check if the list contains all the people vouching for the file
+						for (String c: nlist){
+							if (!(fileCerts.contains(c))){
+								all = false;
+							}
+						}
+						if (all){
+							return nlist;
+						}
+					}
+				}
+				else{ //Check if list contains all people vouching for file
+					boolean all = true;
+					for (String c: nlist){
+						if (!(fileCerts.contains(c))){
+							all = false;
+						}
+					}
+					if (all){
+						return nlist;
+					}
+				}
+			}
+		}
+		return null;
+	}
+	
+	private ArrayList<ArrayList<String>> getCircles(ArrayList<String> certs){
+		ArrayList<ArrayList<String>> masterList = new ArrayList<>();
+		for (String cert: certs){
+			String n = null;
+			String t = cert;
+			ArrayList<String> list = new ArrayList<>();
+			list.add(t);
+			while (true){
+//				n = t.getSignee();
+				if (n == null) break;
+				if (list.contains(n)){
+					if (n.equals(cert)){
+						list.add(cert);
+					}
+					break;
+				}
+				list.add(n);
+				t = n;
+			}
+			masterList.add(list);
+		}
+		return masterList;
+	}
+	
     private void serveClient(SSLSocket sock) throws IOException {
         DataInputStream dis = new DataInputStream(sock.getInputStream());
         byte[] buffer = new byte[BUFFSIZE];
