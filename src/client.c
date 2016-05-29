@@ -32,19 +32,20 @@ void error(const char *msg)
     exit(EXIT_SUCCESS);
 }
 
+//sends a request of size LENGTH to the server
 int sendRequest(SSL *ssl, char *request) {
-	char buffer[LENGTH];
-	memset(buffer, '\0', LENGTH);
-	strcpy(buffer, request);
+	char buffer[LENGTH]; //create buffer
+	memset(buffer, '\0', LENGTH); //empty the buffer
+	strcpy(buffer, request); //copy the request into the buffer
 	if(SSL_write(ssl, buffer, sizeof(buffer)) <= 0) {
         	fprintf(stderr, "[Client] ERROR: Failed to send request. (errno = %d)\n", errno);
 		return EXIT_FAILURE;
-        //return '\0';
     	}
 	return EXIT_SUCCESS;
 
 }
 
+//gets a request from the server of size LENGTH
 int getServerMessage(SSL *ssl) {
     char buffer[LENGTH];
     char  *msg = malloc(LENGTH *sizeof(char));
@@ -57,27 +58,35 @@ int getServerMessage(SSL *ssl) {
             break;
         }
     }
+    //backs up the message to msg
     strcpy(msg, buffer);
-
+		
+    //splits the string at : to check if its an error message
     char *temp = strtok(buffer, ":");
     if(strcmp(temp, "ERROR") == 0) {
+	//error message so print red
 	fprintf(stderr,"\x1b[31m[Server] %s\n\x1b[0m",msg);
 	return EXIT_FAILURE;
     } else {
+	//not an error message so print green
     	fprintf(stderr,"\x1b[32m[Server] %s\n\x1b[0m",msg);
 	return EXIT_SUCCESS;
     }
 }
 
+//send the filesize and filename to the server
 int sendMetaData(char *path, SSL *ssl, char **name) {
     int size = 0;
     char buffer[LENGTH];
     memset(buffer, '\0', LENGTH);
     
+    //get the filesize
     struct stat st;
     stat(path, &st);
     size = st.st_size;
+    //conver the int to network order
     int netsize = htonl(size);
+    //get the filename
     *name = basename(path);
     
     if(SSL_write(ssl, &netsize, sizeof(netsize)) <= 0) {
@@ -88,11 +97,11 @@ int sendMetaData(char *path, SSL *ssl, char **name) {
     strcpy(buffer, *name);
     if(SSL_write(ssl, buffer, sizeof(buffer)) <= 0) {
         fprintf(stderr, "[Client] ERROR: Failed to send file name. (errno = %d)\n", errno);
-        //return '\0';
     }
     return size;
 }
 
+//send the circumference as int to the server
 int sendCircumference(SSL *ssl, int circumference) {
     int netcircumference = htonl(circumference);    
     if(SSL_write(ssl, &netcircumference, sizeof(netcircumference)) <= 0) {
@@ -102,7 +111,7 @@ int sendCircumference(SSL *ssl, int circumference) {
     return EXIT_SUCCESS;
 }
 
-
+//recv the filename of a file from the server of length LENGTH
 char *recvFileName(SSL *ssl) {
     char buffer[LENGTH];
     char *name = malloc((NAME_MAX+1) * sizeof(char));
@@ -123,6 +132,8 @@ char *recvFileName(SSL *ssl) {
     return name;
     
 }
+
+//receive the filesize from the server as int
 int recvFileSize(SSL *ssl) {
     int size = 0;
     char intbuff[sizeof(int)];
@@ -139,10 +150,12 @@ int recvFileSize(SSL *ssl) {
     {
         return 0;
     }
+    //convert the int from network order
     size = ntohl(*((int*)intbuff));
     return size;
 }
 
+//send a file to the server
 int sendFile(SSL *ssl, char *filePath) {
     char buffer[LENGTH];
     FILE *fs = fopen(filePath, "r");
@@ -151,6 +164,7 @@ int sendFile(SSL *ssl, char *filePath) {
         fprintf(stderr,"ERROR: File: %s not found.\n", filePath);
         return EXIT_FAILURE;
     }
+    //send the preliminary metadata to the server
     char *fileName;
     int fileSize = sendMetaData(filePath, ssl, &fileName);
     if(fileName == '\0') {
@@ -165,9 +179,12 @@ int sendFile(SSL *ssl, char *filePath) {
     int bytesSent = 0;
     int totalSent = 0;
     int n = 5;
+    //generate loading bar
     char loading[22];
     memset(loading, ' ', sizeof(loading));
     loading[0] = '[',loading[21] = ']';
+
+    //while there are still bytes to be read from the file send them to the server
     while((fs_block_sz = fread(buffer, sizeof(char), LENGTH, fs)) > 0)
     {
 	bytesSent = SSL_write(ssl, buffer, fs_block_sz);   
@@ -177,6 +194,7 @@ int sendFile(SSL *ssl, char *filePath) {
             return EXIT_FAILURE;
         }
 	totalSent = totalSent + bytesSent;
+	//calculate percentage and print loading bar progress
 	float percent = ((float)totalSent/(float)fileSize)*100;
         if((int)round(percent) == n) {
 		loading[n/5] = '*';
@@ -189,31 +207,35 @@ int sendFile(SSL *ssl, char *filePath) {
     return EXIT_SUCCESS;
 }
 
+//recieve a file from the server and output to stdout
 int receiveFile(SSL *ssl) {
 	
+    //get the filesize anf filename
     int fileSize = recvFileSize(ssl); 	
     if(fileSize == 0) {
         fprintf(stderr, "[Client] Error receiving file metadata from server\n");
         return EXIT_FAILURE;
     }
     char *fileName = recvFileName(ssl);
-        
-    char buffer[LENGTH];
     
-    fprintf(stderr,"Receiving %s which is %i bytes\n",fileName,fileSize);
+    fprintf(stderr,"[Client] Receiving %s which is %i bytes\n",fileName,fileSize);
     free(fileName);
     
+    char buffer[LENGTH];
     memset(buffer, '\0', LENGTH);
     int bytesReceived = 0;
     int totalWritten = 0;
     int remaining = fileSize;
     int n = 5;
+    //generate loading bar
     char loading[22];
     memset(loading, ' ', sizeof(loading));
     loading[0] = '[',loading[21] = ']';
     
+    //while there are still bytes remaining read from socket
     while((bytesReceived = SSL_read(ssl, buffer, MIN(LENGTH, remaining))) > 0)
     {
+	//write those bytes to stdout
         int bytesWritten = fwrite(buffer, sizeof(char), bytesReceived, stdout);
         if(bytesWritten < bytesReceived)
         {
@@ -222,6 +244,7 @@ int receiveFile(SSL *ssl) {
         memset(buffer, '\0', LENGTH);
         totalWritten = totalWritten + bytesWritten;
         remaining = remaining - bytesWritten;
+	//calculate percentage and print loading bar progress
 	float percent = ((float)totalWritten/(float)fileSize)*100;
         if((int)round(percent) == n) {
 		loading[n/5] = '*';
@@ -297,6 +320,7 @@ SSL *createSSL(int sock, SSL_CTX *ctx) {
 
 }
 
+//creates a SSL connection between the client and server
 int connectServer(char * serverAddr, int serverPort) {
     int timeout = 15;	
     int res; 
@@ -357,8 +381,7 @@ int connectServer(char * serverAddr, int serverPort) {
               } 
               // Check the value returned... 
               if (valopt) { 
-                 fprintf(stderr, "[Client] Error in delayed connection() %d - %s\n", valopt, strerror(valopt) 
-); 
+                 fprintf(stderr, "[Client] Error in delayed connection() %d - %s\n", valopt, strerror(valopt)); 
                  exit(-1); 
               } 
               break; 
@@ -415,6 +438,7 @@ int main(int argc, char *argv[])
     int sockfd;
     SSL_CTX *ctx;
 
+    //setup variables that define what the client does
     char request[LENGTH];
     memset(request, '\0', LENGTH);
 
@@ -428,7 +452,9 @@ int main(int argc, char *argv[])
         switch (option) {
             case 'a' : //upload a file
 		fileName = optarg;
+		//print the request to a variable that will be send later
 		snprintf(request, sizeof(request), "add file %s", basename(fileName));
+		//set the mode of the client
 		mode = SEND_MODE;
                 break;
             case 'c' : //provide circumference
@@ -440,6 +466,7 @@ int main(int argc, char *argv[])
 		mode = FETCH_MODE;
                 break;
             case 'h' : //specify server address
+		//get the hostname and port
                 hostname = strtok(optarg, ":");
                 char *temp = strtok(NULL, ":");
 		if(temp != NULL) port = atoi(temp);
@@ -477,22 +504,25 @@ int main(int argc, char *argv[])
         }
 }
 
-    /* Variable Definition */
+    //no hostname specified
     if(hostname == NULL || port == 0) {
     	fprintf(stderr, "[Client] Please specify a hostname and port, type -? for usage\n");
 	exit(EXIT_FAILURE);
     }
-
+    //try and connect to the server
     if((sockfd = connectServer(hostname, port)) == -1) {
     	fprintf(stderr, "[Client] Unable to connect to the server.\n");
 	exit(EXIT_FAILURE);
     }
-		
+    //SSL handshake		
     SSL *ssl = createSSL(sockfd, ctx);
+    
+    //ask the server to server us
     sendRequest(ssl, request); 
-    int getMsg = 1;
+    int getMsg = 1; //whether or not we want to get a message from the server after all is said and done
 
     int result;
+    //execute the requested client options
     switch (mode) {
             case SEND_MODE : 
 		result = sendFile(ssl, fileName); 
@@ -500,7 +530,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		break;
-            case FETCH_MODE : 
+
+            case FETCH_MODE :
+		//first send circumference then send trustedname
 		sendCircumference(ssl, circumference);
 		memset(request, '\0', LENGTH); //empty the request buffer, ready to send trustedname
 		snprintf(request, sizeof(request), "%s",trustedname);	
@@ -510,9 +542,11 @@ int main(int argc, char *argv[])
 		}		
 		result = receiveFile(ssl);
                 break;
+
             case LIST_MODE : 
 		result = receiveFile(ssl);
 		break;
+
             case VOUCH_MODE : 		
 		if(getServerMessage(ssl) == EXIT_FAILURE) {
 			getMsg = 0; 
@@ -524,6 +558,7 @@ int main(int argc, char *argv[])
             case DEFAULT_MODE: fprintf(stderr, "[Client] Please specify a send or receive argument, type -? for usage.\n");
     		exit(EXIT_FAILURE);
     }
+    //get the result of our request back from the server
     if(getMsg) getServerMessage(ssl);
     
        
