@@ -40,29 +40,29 @@ public class Server extends Thread {
     private static KeyStore ks;
     private FileTable fileTable;
 	
-	public Server(int port) {
-
-            this.fileTable = new FileTable();
-            this.fileTable.fileList = (ArrayList<String>) this.fileTable.getArrayList();
-            this.fileTable.table = (Hashtable<String, ArrayList<String>>) this.fileTable.getHashTable();
-            if (this.fileTable.fileList == null){
-                    this.fileTable.fileList = new ArrayList<>();
-                    this.fileTable.saveArrayList();
-            }
-            if (this.fileTable.table == null){
-                    this.fileTable.table = new Hashtable<>();
-                    this.fileTable.saveHashTable();
-            }
-                       
-
-            try {
+    public Server(int port) {
+        //create hashtable and filelist
+        this.fileTable = new FileTable();
+        this.fileTable.fileList = (ArrayList<String>) this.fileTable.getArrayList();
+        this.fileTable.table = (Hashtable<String, ArrayList<String>>) this.fileTable.getHashTable();
+        if (this.fileTable.fileList == null){ //checks if there is a saved list
+            this.fileTable.fileList = new ArrayList<>();
+            this.fileTable.saveArrayList();
+        }
+        if (this.fileTable.table == null){ //checks if there is a saved table
+            this.fileTable.table = new Hashtable<>();
+            this.fileTable.saveHashTable();
+        }
+        
+        //setup server for SSL connection
+        try {
             SSLContext context;
             KeyManagerFactory kmf;
                     
-            char[] storepass = "password".toCharArray();
-            char[] keypass = "password".toCharArray();
+            char[] storepass = "password".toCharArray(); //password for server keystore
+            char[] keypass = "password".toCharArray(); //pasword for server key
                     
-            /*Initialize and load the java keystore*/
+            //Load java keystore and get key
             context = SSLContext.getInstance("TLS");
             kmf = KeyManagerFactory.getInstance("SunX509");
             ks = KeyStore.getInstance("JKS");
@@ -70,222 +70,225 @@ public class Server extends Thread {
             kmf.init(ks, keypass);
             context.init(kmf.getKeyManagers(), null, null);
             
-            /*Create an SSL socket*/
+            //Create SSL socket
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             ss = ssf.createServerSocket(port);
                     
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+	} catch (Exception e) {
+            e.printStackTrace();
 	}
-	
-	public void run() {
-                
-		while (true) {
+    }
+
+    //connect and server clients
+    public void run() {
+	while (true) {
             System.out.println("Waiting for connection...");
-			try {
-				SSLSocket clientSock = (SSLSocket) ss.accept();
-                System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress() + ':' + clientSock.getLocalPort());
-				serveClient(clientSock);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
-	private Object readFileTable(){
-		try{
-			FileInputStream filestream = new FileInputStream("FileTable.ser");
-			ObjectInputStream ois = new ObjectInputStream(filestream);
-			Object obj = ois.readObject();
-			ois.close();
-			filestream.close();
-			return obj;
-		} catch (Exception e){
-			return null;
-		}
-	}
-
-	private boolean saveFile(SSLSocket clientSock) throws IOException {
-		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
-		byte[] buffer = new byte[BUFFSIZE];
-
-            int filesize =  0;
-
             try {
-                filesize = dis.readInt();
-            } catch (EOFException e) {
-                System.err.println("No filesize received from client");
-                return false;
+                SSLSocket clientSock = (SSLSocket) ss.accept();
+                System.out.println("Connected to client on " + clientSock.getRemoteSocketAddress());
+		serveClient(clientSock);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+	}
+    }
+        
+    //gets the filesize, filename and ouptputs the file to stdout
+    private boolean saveFile(SSLSocket clientSock) throws IOException {
+	DataInputStream dis = new DataInputStream(clientSock.getInputStream());
+	byte[] buffer = new byte[BUFFSIZE];
+        int filesize =  0;
+        
+        //try and get the filesize
+        try {
+            filesize = dis.readInt();
+        } catch (EOFException e) {
+            System.err.println("No filesize received from client");
+            return false;
+        }
+
+        System.out.println("Filesize is " + filesize);
+        dis.read(buffer, 0, BUFFSIZE);
+        
+        //get filename
+        String fileName = new String(buffer).split("\0")[0];
+        System.out.println("Filename is " + fileName);
+
+        int n = 0;        
+        int read = 0;
+        int totalRead = 0;
+        int remaining = filesize;
+
+        //create new file on disk
+        File receivedFile = new File(DOWNLOADS + '/' + fileName);
+        FileOutputStream fos = new FileOutputStream(receivedFile);                
+        
+        //read data from socket until all the file's bytes have been read
+        while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
+            totalRead += read;
+            remaining -= read;
+            fos.write(buffer, 0, read);
+            //prints a rubbish loading bar
+            if(round(((float)totalRead/(float)filesize)*100) == n) {
+                n = n+5;
+                System.out.print('|');
             }
 
-            System.out.println("Filesize is " + filesize);
-            dis.read(buffer, 0, BUFFSIZE);
-            String fileName = new String(buffer).split("\0")[0];
-            System.out.println("Filename is " + fileName);
-
-            int read = 0;
-                    int totalRead = 0;
-                    int remaining = filesize;
-
-            File receivedFile = new File(DOWNLOADS + '/' + fileName);
-                    FileOutputStream fos = new FileOutputStream(receivedFile);                
-            //String progress = "[                    ]";
-            int n = 0;
-                    while((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
-                            totalRead += read;
-                            remaining -= read;
-                            //System.out.println("read " + totalRead + " bytes.");
-                            fos.write(buffer, 0, read);
-
-                //System.out.println(round(((float)totalRead/(float)filesize)*100));
-                if(round(((float)totalRead/(float)filesize)*100) == n) {
-                    n = n+5;
-                    System.out.print('|');
-                }
-
-                    }
-            if(totalRead < filesize) {
-                System.err.println("File transfer was unsuccessful.");
-                fos.close();
-                Path p = Paths.get(DOWNLOADS + '/' + fileName);
-                Files.delete(p); 
-                return false;
-            } else {
-                System.out.println("File saved in " + DOWNLOADS + '/' + fileName);
-                fos.close();
-                return true;
+        }
+        // if file was not fully received delete it
+        if(totalRead < filesize) {
+            System.err.println("File transfer was unsuccessful.");
+            fos.close();
+            Path p = Paths.get(DOWNLOADS + '/' + fileName);
+            Files.delete(p); 
+            return false;
+        } else {
+            System.out.println("File saved in " + DOWNLOADS + '/' + fileName);
+            fos.close();
+            return true;
             }
         }
 
-	private boolean checkCircle(String filename, int circumference, String person){
-		if (circumference == 0) return true; //return true if circumference is 0
-		ArrayList<String> fileCerts = this.fileTable.getList(filename);
-		if (person != null){
-			boolean pavailable = false;
-			for (String cert: fileCerts){
-				if (cert.equalsIgnoreCase(person)){
-					pavailable = true;
-				}
-			}
-			if (pavailable == false) return false;
+    private boolean checkCircle(String filename, int circumference, String person){
+	if (circumference == 0) return true; //return true if circumference is 0
+	ArrayList<String> fileCerts = this.fileTable.getList(filename);
+	if (person != null){
+            boolean pavailable = false;
+            for (String cert: fileCerts){
+                if (cert.equalsIgnoreCase(person)){
+                    pavailable = true;
 		}
-		ArrayList<String> circle = findCircle(fileCerts, circumference, person);
-		if (circle != null) return true;
-		return false;
+            }
+            if (pavailable == false) return false;
 	}
+	ArrayList<String> circle = findCircle(fileCerts, circumference, person);
+	if (circle != null) return true;
+	return false;
+    }
 	
-	private ArrayList<String> findCircle(ArrayList<String> fileCerts, int circumference, String person) {
-		ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
-		ArrayList<ArrayList<String>> newList = new ArrayList<>();
+    private ArrayList<String> findCircle(ArrayList<String> fileCerts, int circumference, String person) {
+	ArrayList<ArrayList<String>> masterList = getCircles(fileCerts);
+	ArrayList<ArrayList<String>> newList = new ArrayList<>();
 		
-		for (ArrayList<String> mlist: masterList){
-//			if (mlist.size() >= circumference){
-			if (mlist.size() > circumference){
-				newList.add(mlist);
-			}
-		}
+	for (ArrayList<String> mlist: masterList){
+            if (mlist.size() > circumference){
+		newList.add(mlist);
+            }
+	}
 		
-		for (ArrayList<String> nlist: newList){
-			String first = nlist.get(0);
-			String last = nlist.get(nlist.size()-1);
-			if (first.equals(last)){ //Check if proper closed loop is formed
-				if (person != null){ //Check if a person is required in the loop
-					if (nlist.contains(person)){ //Check if this list contains that person
-						boolean all = true; //Check if the list contains all the people vouching for the file
-						for (String c: nlist){
-							if (!(fileCerts.contains(c))){
-								all = false;
-							}
-						}
-						if (all){
-							return nlist;
-						}
-					}
-				}
-				else{ //Check if list contains all people vouching for file
-					boolean all = true;
-					for (String c: nlist){
-						if (!(fileCerts.contains(c))){
-							all = false;
-						}
-					}
-					if (all){
-						return nlist;
-					}
-				}
+	for (ArrayList<String> nlist: newList){
+            String first = nlist.get(0);
+            String last = nlist.get(nlist.size()-1);
+            if (first.equals(last)){ //Check if proper closed loop is formed
+                if (person != null){ //Check if a person is required in the loop
+                    if (nlist.contains(person)){ //Check if this list contains that person
+                        boolean all = true; //Check if the list contains all the people vouching for the file
+			for (String c: nlist){
+                            if (!(fileCerts.contains(c))){
+                                all = false;
+                            }
 			}
-		}
-		return null;
-	}
-	
-	private ArrayList<ArrayList<String>> getCircles(ArrayList<String> certs){
-		ArrayList<ArrayList<String>> masterList = new ArrayList<>();
-		for (String cert: certs){
-			String n = null;
-			String t = cert;
-			ArrayList<String> list = new ArrayList<>();
-			list.add(t);
-			while (true){
-				n = getSigner(getCert(CERTSTORE + '/' + t + ".cer"));
-				if (n == null) break;
-				if (list.contains(n)){
-					if (n.equals(cert)){
-						list.add(cert);
-					}
-					break;
-				}
-				list.add(n);
-				t = n;
+			if (all){
+                            return nlist;
 			}
-			masterList.add(list);
+                    }
+        	} else{ //Check if list contains all people vouching for file
+                    boolean all = true;
+                    for (String c: nlist){
+                        if (!(fileCerts.contains(c))){
+                            all = false;
+                        }
+                    }
+                    if (all){
+                        return nlist;
+                    }
 		}
-		return masterList;
+            }
 	}
+	return null;
+    }
 	
+    private ArrayList<ArrayList<String>> getCircles(ArrayList<String> certs){
+        ArrayList<ArrayList<String>> masterList = new ArrayList<>();
+	for (String cert: certs){
+            String n = null;
+            String t = cert;
+            ArrayList<String> list = new ArrayList<>();
+            list.add(t);
+            while (true){
+                n = getSigner(getCert(CERTSTORE + '/' + t + ".cer"));
+		if (n == null) break;
+                if (list.contains(n)){
+                    if (n.equals(cert)){
+                        list.add(cert);
+                    }
+                    break;
+                }
+                list.add(n);
+                t = n;
+            }
+            masterList.add(list);
+	}
+	return masterList;
+    }
+
+    //recieved a request from the client and calls the approrate methods
     private void serveClient(SSLSocket sock) throws IOException {
         DataInputStream dis = new DataInputStream(sock.getInputStream());
         byte[] buffer = new byte[BUFFSIZE];
+        //read the request
         dis.read(buffer, 0, BUFFSIZE);
-        
+        //check if a request was received
         if(buffer[0] == 0) {
             System.err.println("No request received from client.");
             return;
         }
+        //setup our variables
         String certOwner;
         String person = null;
         int circumference = 0;
         boolean successful;
+        //Extract the request from the received bytes
         String request = new String(buffer).split("\0")[0];
         String[] requestArgs = request.split(" ");
         System.out.println("Request is " + request);
+        
         switch (requestArgs[0]) {
             case "add":
+                //first save the file
                 successful = saveFile(sock);
+                //next check if the saved file was specifed as a certificate or a file
                 if(successful && requestArgs[1].equals("cert")) {
+                    //if it was a certifcate we want to process it and add it to the store
                     certOwner = processCert(requestArgs[2]);
                     if(certOwner == null) {
                         sendResult(sock, "ERROR: Unable to get cert owner");
                         return;
                     }
+                    //let the client know things are all G
                     sendResult(sock, "The certificate '" + certOwner + "' has been added to the server");
+                //if it was a file we want to add it to the filetable
                 } else if(successful && requestArgs[1].equals("file")) {
-                    this.fileTable.addFile(requestArgs[2]); //add the file to the filetable
+                    //add the file to the filetable
+                    this.fileTable.addFile(requestArgs[2]); 
                     sendResult(sock, requestArgs[2] + " has been added to the server");
                 } else {
                     sendResult(sock, "ERROR: Unable to save file");
                 }
                 break;
+                
             case "fetch": 
-                circumference = dis.readInt();
+                //get the circumference and trustedname
+                circumference = dis.readInt(); //read the filesize
                 dis.read(buffer, 0, BUFFSIZE); //read the trustedname
                 String trustedname = new String(buffer).split("\0")[0];
                 if(!trustedname.equals("(null)")) person = trustedname; //checks whether a trustedname was actually sent          
-                
+                //checks if file is in the filetable
                 if (!this.fileTable.fileList.contains(requestArgs[1])) {
                     sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                     break;
                 }
+                //checks if a circle exists
             	successful = checkCircle(requestArgs[1], circumference, person);
             	if (successful) {
                     if(person != null && circumference != 0) {
@@ -304,10 +307,14 @@ public class Server extends Thread {
                     sendResult(sock, "ERROR: Unable to send the file to the client");
                 }
                 break;
+                
             case "list":  
+                //gets list and saves to file
                 successful = getList();
                 if(successful) {
+                    //sends the list file
                     successful = sendFile(sock, "filelist");
+                    //deletes the list file
                     Files.delete(Paths.get("filelist"));
                     if(successful) {
                         sendResult(sock, "File list has been sent to the client");
@@ -316,20 +323,26 @@ public class Server extends Thread {
                 } 
                 sendResult(sock, "ERROR: Unable to send file list");                
                 break;
+                
             case "vouch":
+                //checks if the file is in the filetable
                 if (!this.fileTable.fileList.contains(requestArgs[1])) {
                     sendResult(sock, "ERROR: File: " + requestArgs[1] + " does not exist on the server");
                     return;
                 }
                 sendResult(sock, "File exists on the server");
+                //save the certificate being sent
                 successful = saveFile(sock);
+                //saving cert was succesful
                 if(successful) {
+                    //add the cert to the certstore
                     certOwner = processCert(requestArgs[2]);
                     if(certOwner == null) {
                         sendResult(sock, "ERROR: Unable to get cert owner");
                         return;
                     }
                     System.out.println("The certificate '" + certOwner + "' has been added to the server");
+                    //vouch for the file
                     successful = vouchFile(requestArgs[1], certOwner);
                     if(successful) {
                         sendResult(sock, certOwner + " succesfuly vouched for file: " + requestArgs[1]);
@@ -342,7 +355,8 @@ public class Server extends Thread {
             	break;
         }
     }
-        
+    
+    //adds the cert to the certstore and renames to cert owner
     String processCert(String certName) throws IOException {
         String owner = null;
         Path source = Paths.get(DOWNLOADS + '/' + certName);
@@ -357,13 +371,15 @@ public class Server extends Thread {
         return owner;
     }
     
+    //adds the cert to the filetable
     boolean vouchFile(String fileName, String certOwner) {
         //add certOwner to file hastable
     	this.fileTable.addCertificate(fileName, certOwner);
         return true;
     }
     
-    Boolean getList() {
+    //gets the list of files and vouchers from the filetable and saves to file 'filelist' in server directory
+    boolean getList() {
     	String list = "";
     	ArrayList<String> fileList = this.fileTable.getFileList();
     	for (String filename: fileList){
@@ -376,7 +392,7 @@ public class Server extends Thread {
                 list += "\n --------------------------------\n";
     	}
         
-        
+        //saves to file
         try(PrintWriter out = new PrintWriter("filelist")  ){
             out.println(list);
             return true;
@@ -384,7 +400,8 @@ public class Server extends Thread {
             return false;
         }
     }
-        
+    
+    //sends a packet of length BUFFSIZE to the client, used to let the client know the result of a request
     void sendResult(SSLSocket clientSock, String msg) throws IOException {
         try {
             DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
@@ -397,7 +414,8 @@ public class Server extends Thread {
         }
      
     }
-        
+     
+    //converts int to byte array, used when sending filesize
     private byte[] intToByteArray(int value) {
         return new byte[] {
             (byte)(value >>> 24),
@@ -405,11 +423,14 @@ public class Server extends Thread {
             (byte)(value >>> 8),
             (byte)value};
     }
-        
+    
+    //sends the file to client
     private boolean sendFile(SSLSocket clientSock, String path) throws IOException {
+        //gets the file from disk
         File myFile = new File(path);  
         byte[] mybytearray = new byte[(int) myFile.length()];
         DataOutputStream dos = new DataOutputStream(clientSock.getOutputStream());     
+        //read the file to a byte array
         try {
             FileInputStream fis = new FileInputStream(myFile);  
             BufferedInputStream bis = new BufferedInputStream(fis);  
@@ -420,7 +441,8 @@ public class Server extends Thread {
             System.err.println("Unable to open or read file.");
             dos.write(intToByteArray(0), 0, 4); //send a filesize of 0 so the client knows things are wrong
             return false;                
-        }   
+        }
+        //sends file
         try {
             
             //Sending file name and file size to the server  
@@ -432,7 +454,6 @@ public class Server extends Thread {
             //Sending file
             dos.write(mybytearray, 0, mybytearray.length);     
             dos.flush();  
-            //dos.close(); 
             System.out.println("File sent!\n");
             return true;
                 
@@ -489,11 +510,11 @@ public class Server extends Thread {
         }
         return owner;
     }
-        
-	public static void main(String[] args) {               
-		Server fs = new Server(1343);
-                
-		fs.start();
+    
+    //creates new server on port 1343
+    public static void main(String[] args) {               
+	Server fs = new Server(1343);        
+	fs.start();
 	}
 
 }
