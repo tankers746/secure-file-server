@@ -26,8 +26,8 @@ public class FileTable {
                 else {
 			ArrayList<String> currList = (ArrayList<String>) table.get(filename);
                         if(!currList.contains(certificate)) {
-			currList.add(certificate);
-			table.put(filename, currList);
+                            currList.add(certificate);
+                            table.put(filename, currList);
                         }
 		}
 	}
