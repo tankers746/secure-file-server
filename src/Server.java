@@ -41,14 +41,13 @@ public class Server extends Thread {
     private FileTable fileTable;
 	
 	public Server(int port) {
-//        fileTable = new FileTable();
-		this.fileTable = (FileTable) readFileTable();
+            this.fileTable = (FileTable) readFileTable();
 		if (this.fileTable == null){
 			System.err.println("Error reading FileTable, creating new FileTable.ser");
 			this.fileTable = new FileTable();
 			this.fileTable.saveFileTable();
 		}
-		try {
+            try {
             SSLContext context;
             KeyManagerFactory kmf;
                     
