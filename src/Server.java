@@ -5,14 +5,15 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+//import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.ObjectInputStream;
+//import java.io.OutputStream;
 import java.io.PrintWriter;
 import static java.lang.Math.round;
 import java.net.ServerSocket;
-import java.net.Socket;
+//import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,7 +41,10 @@ public class Server extends Thread {
     private FileTable fileTable;
 	
 	public Server(int port) {
-            fileTable = new FileTable();
+//        fileTable = new FileTable();
+		this.fileTable = (FileTable) readFileTable();
+		if (this.fileTable == null)
+			System.err.println("Error reading FileTable");
 		try {
             SSLContext context;
             KeyManagerFactory kmf;
@@ -79,6 +83,19 @@ public class Server extends Thread {
 		}
 	}
 	
+	private Object readFileTable(){
+		try{
+			FileInputStream filestream = new FileInputStream("FileTable.ser");
+			ObjectInputStream ois = new ObjectInputStream(filestream);
+			Object obj = ois.readObject();
+			ois.close();
+			filestream.close();
+			return obj;
+		} catch (Exception e){
+			e.printStackTrace();
+		}
+		return null;
+	}
 
 	private boolean saveFile(SSLSocket clientSock) throws IOException {
 		DataInputStream dis = new DataInputStream(clientSock.getInputStream());
@@ -469,7 +486,6 @@ public class Server extends Thread {
         }
         return owner;
     }
-
         
 	public static void main(String[] args) {               
 		Server fs = new Server(1343);
