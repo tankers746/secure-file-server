@@ -513,12 +513,13 @@ int main(int argc, char *argv[])
             case LIST_MODE : 
 		result = receiveFile(ssl);
 		break;
-            case VOUCH_MODE :
- 		getMsg = 0;  		
+            case VOUCH_MODE : 		
 		if(getServerMessage(ssl) == EXIT_FAILURE) {
+			getMsg = 0; 
 			break;
 		}
-		result = sendFile(ssl, fileName); //send the vouching cert to the server
+		result = sendFile(ssl, fileName);//send the vouching cert to the server
+		if(result == EXIT_FAILURE) exit(EXIT_FAILURE);
 		break;
             case DEFAULT_MODE: fprintf(stderr, "[Client] Please specify a send or receive argument, type -? for usage.\n");
     		exit(EXIT_FAILURE);
