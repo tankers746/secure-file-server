@@ -44,7 +44,7 @@ public class Server extends Thread {
 //        fileTable = new FileTable();
 		this.fileTable = (FileTable) readFileTable();
 		if (this.fileTable == null){
-			System.err.println("Error reading FileTable");
+			System.err.println("Error reading FileTable, creating new FileTable.ser");
 			this.fileTable = new FileTable();
 			this.fileTable.saveFileTable();
 		}
@@ -95,9 +95,8 @@ public class Server extends Thread {
 			filestream.close();
 			return obj;
 		} catch (Exception e){
-			e.printStackTrace();
+			return null;
 		}
-		return null;
 	}
 
 	private boolean saveFile(SSLSocket clientSock) throws IOException {
